@@ -94,7 +94,7 @@
               <!-- Dropped when the bottom rail squeezes the grid into more than
                    one row: the numeral already identifies the lane, and the
                    label is the first thing worth losing to keep tiles whole. -->
-              <span x-show="!(controlsPosition === 'bottom' && lanes.length > laneColumns)"
+              <span x-show="!(railMode && lanes.length > laneColumns)"
                     class="mt-1 text-[9px] font-extrabold tracking-[0.14em]"
                     :class="lane.id === activeLaneId ? 'text-navy-tint' : 'text-dim'"
                     x-text="`LANE ${lane.id}`"></span>
@@ -115,28 +115,28 @@
          it — the operator must never have to guess what they're about to
          change. -->
     <section class="flex min-h-0 gap-2.5 p-2.5 bg-surface border-2 border-line rounded-xl shrink-0"
-             :class="controlsPosition === 'bottom' ? 'w-full flex-row items-stretch'
+             :class="railMode ? 'w-full flex-row items-stretch'
                      : lanes.length > 1 ? 'w-76 flex-col' : 'w-full max-w-2xl mx-auto flex-1 flex-col'"
              aria-labelledby="controls-heading">
       <h2 id="controls-heading" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim shrink-0"
-          :class="controlsPosition === 'bottom' ? '[writing-mode:vertical-rl] rotate-180 text-center' : ''">
+          :class="railMode ? '[writing-mode:vertical-rl] rotate-180 text-center' : ''">
         <!-- Short form in the bottom rail: there the heading is rotated, so its
              text length is the rail's height, and a long one squeezes the lane
              grid until tiles clip. -->
-        <span x-text="controlsPosition === 'bottom'
+        <span x-text="railMode
                         ? (lanes.length > 1 ? `Lane ${activeLaneId}` : 'Audio')
                         : (lanes.length > 1 ? `Lane ${activeLaneId} · Mic &amp; speakers` : 'Mic &amp; speakers')">Mic &amp; speakers</span>
       </h2>
 
       <!-- One markup for all three positions: only the flex direction of this
            wrapper changes. -->
-      <div class="flex gap-2.5" :class="controlsPosition === 'bottom' ? 'flex-row items-stretch flex-1' : 'flex-col'">
+      <div class="flex gap-2.5" :class="railMode ? 'flex-row items-stretch flex-1' : 'flex-col'">
 
-        <div class="flex gap-2.5" :class="controlsPosition === 'bottom' ? 'flex-1' : ''">
+        <div class="flex gap-2.5" :class="railMode ? 'flex-1' : ''">
           <button type="button" aria-label="Microphone" :aria-pressed="active.mic"
                   x-on:pointerup.prevent.throttle.250ms="toggleMic()"
                   class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer"
-                  :class="(controlsPosition === 'bottom' ? 'min-h-16 ' : 'min-h-24 ') + (active.mic ? 'bg-on border-on-d text-white shadow-[0_4px_0_var(--color-on-d)]'
+                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (active.mic ? 'bg-on border-on-d text-white shadow-[0_4px_0_var(--color-on-d)]'
                                      : 'bg-alt border-line text-txt')">
             <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/>
@@ -149,7 +149,7 @@
           <button type="button" aria-label="Speakers" :aria-pressed="active.mute"
                   x-on:pointerup.prevent.throttle.250ms="toggleMute()"
                   class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer"
-                  :class="(controlsPosition === 'bottom' ? 'min-h-16 ' : 'min-h-24 ') + (!active.mute ? 'bg-warn border-warn-d text-white shadow-[0_4px_0_var(--color-warn-d)]'
+                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (!active.mute ? 'bg-warn border-warn-d text-white shadow-[0_4px_0_var(--color-warn-d)]'
                                        : 'bg-alt border-line text-txt')">
             <!-- The glyph tracks the state so it can never contradict the label. -->
             <svg x-show="active.mute" class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
@@ -167,12 +167,12 @@
         </div>
 
         <div class="flex items-center gap-2.5 shrink-0"
-             :class="controlsPosition === 'bottom' ? '' : 'justify-between'">
+             :class="railMode ? '' : 'justify-between'">
           <button type="button" aria-label="Volume down" :disabled="volume <= 0"
                   x-on:pointerup.prevent.throttle.150ms="nudgeVolume(-volumeStep)"
                   class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
 
-          <div class="flex flex-col items-center leading-none" :class="controlsPosition === 'bottom' ? 'w-24' : ''">
+          <div class="flex flex-col items-center leading-none" :class="railMode ? 'w-24' : ''">
             <span class="text-4xl font-extrabold tabular-nums text-navy" x-text="volume">60</span>
             <!-- "MASTER" because this is one console-wide volume, not the
                  volume of the lane named in the card heading above. -->
@@ -186,7 +186,7 @@
       </div>
 
       <div class="flex gap-[3px] shrink-0" role="img" aria-label="Audio level meter"
-           :class="controlsPosition === 'bottom' ? 'flex-col-reverse w-4' : 'h-4'">
+           :class="railMode ? 'flex-col-reverse w-4' : 'h-4'">
         <template x-for="seg in meterSegments" :key="seg">
           <span class="flex-1 rounded-sm" :class="meterSegmentClass(seg)"></span>
         </template>

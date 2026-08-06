@@ -94,6 +94,14 @@ document.addEventListener("alpine:init", function () {
         return byCount[this.lanes.length] || Math.ceil(Math.sqrt(this.lanes.length));
       },
 
+      /* True only when the control cluster is actually a bottom rail. At a
+         single lane the lane grid is hidden, so there is nothing for the rail
+         to sit below — it would strand itself at the top of an empty screen.
+         The cluster falls back to the stacked, centred card instead. */
+      get railMode() {
+        return this.controlsPosition === "bottom" && this.lanes.length > 1;
+      },
+
       /* ---------- Meter ---------- */
 
       /* Small meter inside each lane tile. Same rule as the big meter, applied
