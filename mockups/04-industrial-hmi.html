@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>04 — Industrial HMI</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#0a0a0a;color:#e8e8e8;
+  font-family:ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;
+  background:#141414;border-bottom:3px solid #333}
+h1{font-size:15px;font-weight:700;letter-spacing:.22em}
+.lamp{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.16em}
+.led{width:14px;height:14px;border-radius:50%;background:#22c55e;
+  box-shadow:0 0 10px #22c55e,inset 0 0 4px rgba(255,255,255,.6);border:2px solid #0a0a0a}
+main{flex:1;display:grid;grid-template-columns:1fr 300px;gap:8px;padding:8px;min-height:0}
+.box{border:3px solid #333;background:#111;display:flex;flex-direction:column}
+.bt{background:#333;color:#ffb000;font-size:11px;font-weight:700;letter-spacing:.2em;padding:5px 9px}
+.bb{flex:1;padding:8px;display:flex;flex-direction:column;gap:8px}
+.lanes{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lane{border:3px solid #333;background:#161616;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;position:relative}
+.lane.on{border-color:#ffb000;background:#241a00}
+.lane b{font-size:36px;font-weight:700;line-height:1}
+.lane.on b{color:#ffb000}
+.lane .tag{font-size:10px;letter-spacing:.16em;color:#777}
+.lane.on .tag{color:#ffb000}
+.leds{display:flex;gap:8px;position:absolute;top:8px;right:8px}
+.l2{width:11px;height:11px;border-radius:50%;background:#2a2a2a;border:2px solid #0a0a0a}
+.l2.g{background:#22c55e;box-shadow:0 0 8px #22c55e}
+.l2.a{background:#ffb000;box-shadow:0 0 8px #ffb000}
+.sw{border:3px solid #333;background:#161616;padding:9px;display:flex;
+  align-items:center;justify-content:space-between}
+.sw .k{font-size:11px;letter-spacing:.16em;color:#999}
+.sw .v{font-size:15px;font-weight:700;letter-spacing:.12em}
+.sw.on{border-color:#22c55e}.sw.on .v{color:#22c55e}
+.sw.warn{border-color:#ffb000}.sw.warn .v{color:#ffb000}
+.vol{display:flex;align-items:stretch;gap:8px}
+.step{width:62px;border:3px solid #333;background:#161616;font-size:26px;
+  display:flex;align-items:center;justify-content:center}
+.rd{flex:1;border:3px solid #333;background:#0a0a0a;display:flex;flex-direction:column;
+  align-items:center;justify-content:center}
+.rd b{font-size:34px;color:#ffb000;line-height:1;font-weight:700}
+.rd span{font-size:9px;letter-spacing:.2em;color:#777}
+.bars{display:flex;gap:2px;height:22px}
+.bar{flex:1;background:#1c1c1c;border:1px solid #262626}
+.bar.g{background:#22c55e}.bar.a{background:#ffb000}.bar.r{background:#dc2626}
+footer{background:#141414;border-top:3px solid #333;padding:5px 12px;display:flex;
+  justify-content:space-between;font-size:11px;color:#777;letter-spacing:.1em}
+</style></head><body>
+<header><h1>OPERATOR CONSOLE</h1><div class="lamp"><span class="led"></span>SYS READY</div></header>
+<main>
+  <div class="box">
+    <div class="bt">LANE SELECT</div>
+    <div class="bb"><div class="lanes">
+      <div class="lane"><div class="leds"><i class="l2"></i><i class="l2"></i></div><b>1</b><span class="tag">STANDBY</span></div>
+      <div class="lane on"><div class="leds"><i class="l2 g"></i><i class="l2 a"></i></div><b>2</b><span class="tag">ACTIVE</span></div>
+      <div class="lane"><div class="leds"><i class="l2"></i><i class="l2"></i></div><b>3</b><span class="tag">STANDBY</span></div>
+      <div class="lane"><div class="leds"><i class="l2 g"></i><i class="l2"></i></div><b>4</b><span class="tag">MIC OPEN</span></div>
+    </div></div>
+  </div>
+  <div class="box">
+    <div class="bt">LANE 02 CONTROL</div>
+    <div class="bb">
+      <div class="sw on"><span class="k">MIC</span><span class="v">LIVE</span></div>
+      <div class="sw warn"><span class="k">SPKR</span><span class="v">ON</span></div>
+      <div class="vol">
+        <div class="step">−</div>
+        <div class="rd"><b>065</b><span>VOL</span></div>
+        <div class="step">+</div>
+      </div>
+      <div class="bars">
+        <i class="bar g"></i><i class="bar g"></i><i class="bar g"></i><i class="bar g"></i><i class="bar g"></i>
+        <i class="bar g"></i><i class="bar g"></i><i class="bar g"></i><i class="bar a"></i><i class="bar a"></i>
+        <i class="bar"></i><i class="bar"></i><i class="bar"></i><i class="bar"></i>
+      </div>
+    </div>
+  </div>
+</main>
+<footer><span>LANE 02 MIC LIVE</span><span>REV 0.2.0</span></footer>
+</body></html>

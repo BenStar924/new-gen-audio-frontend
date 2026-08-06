@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>03 — Side rail</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#101419;color:#e6edf5;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex}
+.rail{width:112px;background:#080a0e;border-right:1px solid #232c39;display:flex;
+  flex-direction:column;gap:6px;padding:8px}
+.rl{flex:1;border-radius:10px;background:#171c24;border:1px solid #232c39;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:4px;position:relative}
+.rl.on{background:#2f81f7;border-color:#8ec0ff}
+.rl.on::before{content:"";position:absolute;left:-8px;top:14px;bottom:14px;width:4px;
+  border-radius:99px;background:#8ec0ff}
+.rl b{font-size:28px;font-weight:800;line-height:1}
+.rl small{font-size:9px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+.rl.on small{color:#dbeafe}
+.dots{display:flex;gap:5px;margin-top:2px}
+.d{width:7px;height:7px;border-radius:50%;background:#2c3542}
+.d.mic{background:#2ea043}.d.spk{background:#d29922}
+main{flex:1;display:flex;flex-direction:column;padding:14px;gap:12px}
+.top{display:flex;align-items:baseline;justify-content:space-between}
+.h{font-size:26px;font-weight:800;letter-spacing:.01em}
+.sub{font-size:11px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{height:118px;border-radius:14px;border:1px solid #2c3542;background:#171c24;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.btn .ic{font-size:30px}
+.btn .lb{font-size:12px;color:#94a3b3}
+.btn .st{font-size:16px;font-weight:800;letter-spacing:.08em}
+.btn.live{background:#2ea043;border-color:#2ea043;color:#06210d}
+.btn.live .lb{color:#0b3d18}
+.row{display:flex;align-items:center;gap:12px}
+.step{width:74px;height:74px;border-radius:14px;border:1px solid #2c3542;background:#171c24;
+  font-size:30px;display:flex;align-items:center;justify-content:center}
+.vw{flex:1;display:flex;flex-direction:column;gap:8px}
+.vt{display:flex;align-items:baseline;justify-content:center;gap:8px}
+.vt b{font-size:40px;font-weight:800;line-height:1}
+.vt span{font-size:11px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+.track{height:12px;border-radius:99px;background:#080a0e;overflow:hidden}
+.track i{display:block;height:100%;width:65%;background:#2f81f7;border-radius:99px}
+.meter{display:flex;gap:3px;height:14px}
+.seg{flex:1;border-radius:2px;background:#171c24}
+.seg.g{background:#2ea043}.seg.a{background:#d29922}
+</style></head><body>
+<div class="rail">
+  <div class="rl"><b>1</b><small>LANE</small><div class="dots"><i class="d"></i><i class="d"></i></div></div>
+  <div class="rl on"><b>2</b><small>LANE</small><div class="dots"><i class="d mic"></i><i class="d spk"></i></div></div>
+  <div class="rl"><b>3</b><small>LANE</small><div class="dots"><i class="d"></i><i class="d"></i></div></div>
+  <div class="rl"><b>4</b><small>LANE</small><div class="dots"><i class="d mic"></i><i class="d"></i></div></div>
+</div>
+<main>
+  <div class="top"><div class="h">Lane 2</div><div class="sub">READY · ⚙</div></div>
+  <div class="pair">
+    <div class="btn live"><div class="ic">🎙</div><div class="lb">Mic</div><div class="st">LIVE</div></div>
+    <div class="btn"><div class="ic">🔊</div><div class="lb">Speakers</div><div class="st">ON</div></div>
+  </div>
+  <div class="row">
+    <div class="step">−</div>
+    <div class="vw">
+      <div class="vt"><b>65</b><span>VOL</span></div>
+      <div class="track"><i></i></div>
+    </div>
+    <div class="step">+</div>
+  </div>
+  <div class="meter">
+    <i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i>
+    <i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i>
+    <i class="seg g"></i><i class="seg g"></i><i class="seg a"></i><i class="seg a"></i>
+    <i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i>
+  </div>
+</main>
+</body></html>

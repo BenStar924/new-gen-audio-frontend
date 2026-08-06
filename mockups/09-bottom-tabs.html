@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>09 — Bottom tab bar</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#111827;color:#f1f5f9;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px}
+.ttl{font-size:25px;font-weight:700;letter-spacing:-.01em}
+.ttl small{display:block;font-size:11px;font-weight:700;letter-spacing:.16em;color:#94a3b8;margin-top:3px}
+.right{display:flex;align-items:center;gap:10px}
+.chip{padding:7px 14px;border-radius:99px;background:#064e3b;color:#6ee7b7;font-size:11px;
+  font-weight:800;letter-spacing:.12em}
+.gear{width:50px;height:50px;border-radius:14px;background:#1f2937;display:flex;
+  align-items:center;justify-content:center;font-size:21px}
+main{flex:1;display:flex;flex-direction:column;gap:12px;padding:0 18px 12px;min-height:0}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1}
+.tile{border-radius:20px;background:#1f2937;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:7px}
+.tile .ic{font-size:34px}
+.tile .lb{font-size:13px;color:#94a3b8}
+.tile .st{font-size:19px;font-weight:800;letter-spacing:.05em}
+.tile.live{background:#059669;color:#022c22}.tile.live .lb{color:#064e3b}
+.tile.amber{background:#1f2937}
+.vrow{display:flex;align-items:center;gap:12px}
+.step{width:74px;height:74px;border-radius:20px;background:#1f2937;font-size:31px;
+  display:flex;align-items:center;justify-content:center}
+.vbox{flex:1;height:74px;border-radius:20px;background:#1f2937;display:flex;
+  align-items:center;justify-content:center;gap:14px;position:relative;overflow:hidden}
+.vfill{position:absolute;left:0;top:0;bottom:0;width:65%;background:#1d4ed8;opacity:.32}
+.vbox b{font-size:33px;font-weight:800;position:relative}
+.vbox span{font-size:11px;letter-spacing:.16em;color:#94a3b8;font-weight:800;position:relative}
+.tabs{height:92px;display:flex;gap:2px;background:#0b1220;border-top:1px solid #1f2937;padding:6px}
+.tab{flex:1;border-radius:14px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;color:#64748b}
+.tab.on{background:#1d4ed8;color:#fff}
+.tab b{font-size:25px;font-weight:800;line-height:1}
+.tab small{font-size:10px;letter-spacing:.14em;font-weight:800}
+.pips{display:flex;gap:5px;height:7px}
+.p{width:7px;height:7px;border-radius:50%;background:#1f2937}
+.p.g{background:#10b981}.p.a{background:#f59e0b}
+.tab.on .p{background:rgba(255,255,255,.35)}
+.tab.on .p.g{background:#6ee7b7}.tab.on .p.a{background:#fcd34d}
+</style></head><body>
+<header>
+  <div class="ttl">Lane 2<small>OPERATOR CONSOLE</small></div>
+  <div class="right"><div class="chip">READY</div><div class="gear">⚙</div></div>
+</header>
+<main>
+  <div class="pair">
+    <div class="tile live"><div class="ic">🎙</div><div class="lb">Mic</div><div class="st">LIVE</div></div>
+    <div class="tile amber"><div class="ic">🔊</div><div class="lb">Speakers</div><div class="st">ON</div></div>
+  </div>
+  <div class="vrow">
+    <div class="step">−</div>
+    <div class="vbox"><div class="vfill"></div><b>65</b><span>VOL</span></div>
+    <div class="step">+</div>
+  </div>
+</main>
+<div class="tabs">
+  <div class="tab"><b>1</b><small>LANE</small><div class="pips"><i class="p"></i><i class="p"></i></div></div>
+  <div class="tab on"><b>2</b><small>LANE</small><div class="pips"><i class="p g"></i><i class="p a"></i></div></div>
+  <div class="tab"><b>3</b><small>LANE</small><div class="pips"><i class="p"></i><i class="p"></i></div></div>
+  <div class="tab"><b>4</b><small>LANE</small><div class="pips"><i class="p g"></i><i class="p"></i></div></div>
+</div>
+</body></html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>05 — Daylight (light theme)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#eef1f5;color:#0f172a;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;
+  background:#fff;border-bottom:2px solid #cbd5e1}
+h1{font-size:18px;font-weight:700}
+.pill{display:flex;align-items:center;gap:8px;padding:7px 15px;border-radius:99px;
+  background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;letter-spacing:.12em}
+.dot{width:9px;height:9px;border-radius:50%;background:#16a34a}
+.gear{width:52px;height:52px;border-radius:12px;background:#fff;border:2px solid #cbd5e1;
+  display:flex;align-items:center;justify-content:center;font-size:22px}
+main{flex:1;display:grid;grid-template-columns:1fr 322px;gap:12px;padding:12px;min-height:0}
+.card{background:#fff;border:2px solid #cbd5e1;border-radius:14px;padding:12px;
+  display:flex;flex-direction:column;gap:10px;min-height:0}
+.label{font-size:10px;font-weight:800;letter-spacing:.14em;color:#64748b;text-transform:uppercase}
+.lanes{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lane{border-radius:12px;border:2px solid #cbd5e1;background:#f8fafc;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.lane.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff;box-shadow:0 4px 0 #1e3a8a}
+.lane b{font-size:32px;font-weight:800;line-height:1}
+.dots{display:flex;gap:6px}
+.d{width:9px;height:9px;border-radius:50%;background:#cbd5e1}
+.lane.on .d{background:rgba(255,255,255,.4)}
+.d.mic{background:#16a34a}.d.spk{background:#ea580c}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border-radius:12px;border:2px solid #cbd5e1;background:#f8fafc;padding:14px 6px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#475569}
+.btn .st{font-size:14px;font-weight:800;letter-spacing:.06em;color:#0f172a}
+.btn.live{background:#16a34a;border-color:#16a34a;color:#dcfce7;box-shadow:0 4px 0 #14532d}
+.btn.live .st{color:#fff}
+.vol{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.step{width:58px;height:58px;border-radius:12px;border:2px solid #cbd5e1;background:#f8fafc;
+  font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 0 #cbd5e1}
+.num{font-size:36px;font-weight:800;line-height:1;text-align:center}
+.unit{font-size:10px;font-weight:800;letter-spacing:.14em;color:#64748b;margin-top:3px}
+.meter{display:flex;gap:3px;height:16px}
+.seg{flex:1;border-radius:3px;background:#e2e8f0}
+.seg.g{background:#16a34a}.seg.a{background:#ea580c}
+footer{display:flex;justify-content:space-between;padding:7px 16px;background:#fff;
+  border-top:2px solid #cbd5e1;font-size:11px;color:#64748b}
+</style></head><body>
+<header>
+  <h1>Operator Console</h1>
+  <div style="display:flex;gap:10px;align-items:center">
+    <div class="pill"><span class="dot"></span>READY</div><div class="gear">⚙</div>
+  </div>
+</header>
+<main>
+  <div class="card">
+    <div class="label">Lane</div>
+    <div class="lanes">
+      <div class="lane"><b>1</b><div class="dots"><i class="d"></i><i class="d"></i></div></div>
+      <div class="lane on"><b>2</b><div class="dots"><i class="d mic"></i><i class="d spk"></i></div></div>
+      <div class="lane"><b>3</b><div class="dots"><i class="d"></i><i class="d"></i></div></div>
+      <div class="lane"><b>4</b><div class="dots"><i class="d mic"></i><i class="d"></i></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">Lane 2 · Audio</div>
+    <div class="pair">
+      <div class="btn live"><div style="font-size:24px">🎙</div>Mic<span class="st">LIVE</span></div>
+      <div class="btn"><div style="font-size:24px">🔊</div>Speakers<span class="st">ON</span></div>
+    </div>
+    <div class="vol">
+      <div class="step">−</div>
+      <div><div class="num">65</div><div class="unit">VOL</div></div>
+      <div class="step">+</div>
+    </div>
+    <div class="meter">
+      <i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i>
+      <i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg g"></i>
+      <i class="seg g"></i><i class="seg g"></i><i class="seg g"></i><i class="seg a"></i><i class="seg a"></i>
+      <i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i>
+    </div>
+  </div>
+</main>
+<footer><span>Lane 2 mic live</span><span>v0.2.0</span></footer>
+</body></html>

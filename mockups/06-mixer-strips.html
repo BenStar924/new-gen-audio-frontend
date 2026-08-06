@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>06 — Mixer strips</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#0d1014;color:#e6edf5;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;
+  background:#141920;border-bottom:1px solid #242e3a;font-size:15px;font-weight:600}
+.sub{font-size:10px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+main{flex:1;display:flex;gap:8px;padding:10px;min-height:0}
+.strip{flex:1;background:#141920;border:1px solid #242e3a;border-radius:12px;
+  display:flex;flex-direction:column;align-items:center;gap:7px;padding:9px 7px}
+.strip.on{border-color:#2f81f7;background:#141c2b;box-shadow:inset 0 0 0 1px #2f81f7}
+.hd{font-size:22px;font-weight:800;line-height:1}
+.strip.on .hd{color:#7db3ff}
+.tg{font-size:9px;letter-spacing:.14em;font-weight:800;color:#94a3b3}
+.body{flex:1;display:flex;gap:7px;width:100%;min-height:0}
+.fader{width:34px;border-radius:8px;background:#0d1014;border:1px solid #242e3a;position:relative}
+.fill{position:absolute;left:2px;right:2px;bottom:2px;border-radius:6px;background:#2f81f7}
+.knob{position:absolute;left:-3px;right:-3px;height:12px;border-radius:4px;background:#94a3b3;border:1px solid #0d1014}
+.mtr{flex:1;border-radius:8px;background:#0d1014;border:1px solid #242e3a;position:relative;overflow:hidden}
+.mtr i{position:absolute;left:2px;right:2px;bottom:2px;border-radius:6px;
+  background:linear-gradient(#da3633,#d29922 35%,#2ea043 65%)}
+.val{font-size:16px;font-weight:800;line-height:1}
+.bs{width:100%;display:flex;flex-direction:column;gap:5px}
+.b{height:38px;border-radius:8px;border:1px solid #242e3a;background:#1b2330;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;letter-spacing:.08em;color:#94a3b3}
+.b.mic{background:#2ea043;border-color:#2ea043;color:#06210d}
+.b.spk{background:#d29922;border-color:#d29922;color:#241a00}
+footer{background:#141920;border-top:1px solid #242e3a;padding:6px 14px;display:flex;
+  justify-content:space-between;font-size:11px;color:#94a3b3}
+</style></head><body>
+<header><span>Operator Console</span><span class="sub">ALL LANES · READY · ⚙</span></header>
+<main>
+  <div class="strip">
+    <div class="hd">1</div><div class="tg">LANE 1</div>
+    <div class="body">
+      <div class="fader"><div class="fill" style="height:60%"></div><div class="knob" style="bottom:58%"></div></div>
+      <div class="mtr"><i style="height:0"></i></div>
+    </div>
+    <div class="val">60</div>
+    <div class="bs"><div class="b">MIC</div><div class="b">SPKR</div></div>
+  </div>
+  <div class="strip on">
+    <div class="hd">2</div><div class="tg">LANE 2</div>
+    <div class="body">
+      <div class="fader"><div class="fill" style="height:65%"></div><div class="knob" style="bottom:63%"></div></div>
+      <div class="mtr"><i style="height:62%"></i></div>
+    </div>
+    <div class="val">65</div>
+    <div class="bs"><div class="b mic">MIC</div><div class="b spk">SPKR</div></div>
+  </div>
+  <div class="strip">
+    <div class="hd">3</div><div class="tg">LANE 3</div>
+    <div class="body">
+      <div class="fader"><div class="fill" style="height:45%"></div><div class="knob" style="bottom:43%"></div></div>
+      <div class="mtr"><i style="height:0"></i></div>
+    </div>
+    <div class="val">45</div>
+    <div class="bs"><div class="b">MIC</div><div class="b">SPKR</div></div>
+  </div>
+  <div class="strip">
+    <div class="hd">4</div><div class="tg">LANE 4</div>
+    <div class="body">
+      <div class="fader"><div class="fill" style="height:72%"></div><div class="knob" style="bottom:70%"></div></div>
+      <div class="mtr"><i style="height:18%"></i></div>
+    </div>
+    <div class="val">72</div>
+    <div class="bs"><div class="b mic">MIC</div><div class="b">SPKR</div></div>
+  </div>
+</main>
+<footer><span>Lane 2 mic live · Lane 4 mic live</span><span>v0.2.0</span></footer>
+</body></html>

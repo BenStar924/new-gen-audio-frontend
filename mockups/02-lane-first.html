@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>02 — Lane-first full bleed</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#0b0e13;color:#e6edf5;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+.grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px;padding:4px}
+.lane{border-radius:14px;background:#171c24;border:2px solid #232c39;position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.lane.on{background:#1d4ed8;border-color:#60a5fa}
+.n{font-size:72px;font-weight:800;line-height:.9}
+.nm{font-size:13px;letter-spacing:.16em;color:#94a3b3;font-weight:700}
+.lane.on .nm{color:#cfe0ff}
+.tags{position:absolute;top:12px;left:12px;display:flex;gap:6px}
+.tag{font-size:10px;font-weight:800;letter-spacing:.1em;padding:4px 9px;border-radius:99px;
+  background:#212936;color:#94a3b3}
+.tag.mic{background:#2ea043;color:#06210d}
+.tag.spk{background:#d29922;color:#241a00}
+.lvl{position:absolute;right:12px;top:12px;bottom:12px;width:8px;border-radius:99px;background:#0b0e13;overflow:hidden}
+.lvl i{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(#d29922,#2ea043);border-radius:99px}
+.bar{height:96px;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#171c24;border-top:2px solid #232c39}
+.ctx{font-size:11px;font-weight:800;letter-spacing:.12em;color:#94a3b3;writing-mode:vertical-rl;
+  transform:rotate(180deg);text-align:center}
+.b{flex:1;height:100%;border-radius:12px;border:1px solid #2c3542;background:#212936;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:#94a3b3}
+.b .s{font-size:15px;font-weight:800;letter-spacing:.06em;color:#e6edf5}
+.b.live{background:#2ea043;border-color:#2ea043}.b.live .s,.b.live{color:#06210d}
+.step{width:76px;height:100%;border-radius:12px;border:1px solid #2c3542;background:#212936;
+  font-size:32px;display:flex;align-items:center;justify-content:center}
+.vol{width:110px;text-align:center}
+.vol b{font-size:36px;font-weight:800;line-height:1}
+.vol span{display:block;font-size:10px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+</style></head><body>
+<div class="grid">
+  <div class="lane"><div class="tags"><span class="tag">OFF</span></div><div class="n">1</div><div class="nm">LANE 1</div>
+    <div class="lvl"><i style="height:0"></i></div></div>
+  <div class="lane on"><div class="tags"><span class="tag mic">MIC</span><span class="tag spk">65</span></div>
+    <div class="n">2</div><div class="nm">LANE 2</div><div class="lvl"><i style="height:62%"></i></div></div>
+  <div class="lane"><div class="tags"><span class="tag">OFF</span></div><div class="n">3</div><div class="nm">LANE 3</div>
+    <div class="lvl"><i style="height:0"></i></div></div>
+  <div class="lane"><div class="tags"><span class="tag mic">MIC</span></div><div class="n">4</div><div class="nm">LANE 4</div>
+    <div class="lvl"><i style="height:0"></i></div></div>
+</div>
+<div class="bar">
+  <div class="ctx">LANE 2</div>
+  <div class="b live">Mic<span class="s">LIVE</span></div>
+  <div class="b">Speakers<span class="s">ON</span></div>
+  <div class="step">−</div>
+  <div class="vol"><b>65</b><span>VOL</span></div>
+  <div class="step">+</div>
+  <div class="step">⚙</div>
+</div>
+</body></html>
