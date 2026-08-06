@@ -28,14 +28,17 @@ MIN_LANES = 1
 MAX_LANES = 8
 LAYOUTS = ("left", "right", "bottom")
 
+# Audio is console-wide because the hardware is: one amplifier mute (GPIO25),
+# one mic enable (GPIO24), one master volume. A lane is a routing destination.
 state = {
-    "lanes": [],
-    "lane": 1,
+    "lanes": 4,
+    "lane": 0,        # 0 = no lane selected
+    "mic": False,
+    "mute": True,     # matches the config.txt boot state
     "layout": "right",
-    # Master volume: one per console, not one per lane.
     "volume": 60,
     "brightness": 80,
-    "message": "Mock backend — no hardware attached",
+    "message": "No lane selected",
 }
 
 
@@ -43,47 +46,55 @@ def clamp(value, low, high):
     return max(low, min(high, value))
 
 
-def new_lane(lane_id):
-    # Muted matches the config.txt boot state (gpio=25=op,dh — GPIO25 is an
-    # active-high mute), which is what the real backend reports at startup.
-    return {"id": lane_id, "mic": False, "mute": True, "level": 0}
-
-
 def set_lane_count(count):
     count = clamp(count, MIN_LANES, MAX_LANES)
-    lanes = state["lanes"]
+    state["lanes"] = count
 
-    if count < len(lanes):
-        del lanes[count:]
-    else:
-        while len(lanes) < count:
-            lanes.append(new_lane(len(lanes) + 1))
-
-    # The active lane can be the one that just disappeared.
+    # The selected lane can be the one that just disappeared. Release rather
+    # than re-point: moving a live microphone somewhere the operator did not
+    # ask for is the wrong recovery.
     if state["lane"] > count:
-        state["lane"] = count
+        release_lane()
 
     return count
 
 
-def find_lane(lane_id):
-    for lane in state["lanes"]:
-        if lane["id"] == lane_id:
-            return lane
-    return None
+def select_lane(lane):
+    """Selecting routes a lane and opens the mic and speakers.
+
+    Re-selecting the lane already held releases it, as does lane 0.
+    """
+    if lane == state["lane"] or lane == 0:
+        release_lane()
+        return True
+
+    if lane < 1 or lane > state["lanes"]:
+        return False
+
+    state["lane"] = lane
+    state["mic"] = True
+    state["mute"] = False
+    state["message"] = "Lane %d live" % lane
+    return True
 
 
-def simulated_level(lane):
+def release_lane():
+    state["lane"] = 0
+    state["mic"] = False
+    state["mute"] = True
+    state["message"] = "No lane selected"
+
+
+def simulated_level():
     """Fake an input level so the meter has something to show.
 
-    Only moves while that lane's mic is live and its speakers are un-muted,
-    which is also the only time the real meter would read anything. Lanes are
-    detuned against each other so they don't move in lockstep.
+    Only moves while a lane is held with the mic live and speakers un-muted —
+    the only time the real meter would read anything.
     """
-    if lane["mute"] or not lane["mic"]:
+    if state["lane"] == 0 or state["mute"] or not state["mic"]:
         return 0
 
-    now = time.time() + lane["id"] * 3.7
+    now = time.time()
     wave = math.sin(now * 2.3) + 0.6 * math.sin(now * 5.1)
     return int(clamp(45 + wave * 28, 0, 100))
 
@@ -95,9 +106,8 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.split("?")[0] == "/api/status":
             payload = dict(state)
-            payload["lanes"] = [
-                dict(lane, level=simulated_level(lane)) for lane in state["lanes"]
-            ]
+            payload["level"] = simulated_level()
+            payload["hardware"] = False
             return self.send_json(payload)
 
         return super().do_GET()
@@ -111,17 +121,14 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError):
             return self.send_json({"error": "malformed body"}, status=400)
 
-        # Console-wide commands.
         if path == "/api/lane":
-            lane_id = int(body.get("lane", state["lane"]))
-            if find_lane(lane_id) is None:
+            lane = int(body.get("lane", 0))
+            if not select_lane(lane):
                 return self.send_json({"error": "no such lane"}, status=400)
-            state["lane"] = lane_id
-            state["message"] = "Lane %d active" % lane_id
             return self.send_json({"ok": True})
 
         if path == "/api/lanes":
-            count = set_lane_count(int(body.get("count", len(state["lanes"]))))
+            count = set_lane_count(int(body.get("count", state["lanes"])))
             state["message"] = "%d lane%s configured" % (count, "" if count == 1 else "s")
             return self.send_json({"ok": True, "count": count})
 
@@ -141,23 +148,21 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             state["brightness"] = clamp(int(body.get("value", state["brightness"])), 0, 100)
             return self.send_json({"ok": True})
 
-        # Per-lane commands. These act on the lane named in the body, not on
-        # whatever happens to be selected — the UI is not the source of truth
-        # for which lane a command targets.
+        # Manual overrides, only while a lane is held — there is nothing routed
+        # to open a microphone into otherwise.
         if path in ("/api/mic", "/api/mute"):
-            lane = find_lane(int(body.get("lane", state["lane"])))
-            if lane is None:
-                return self.send_json({"error": "no such lane"}, status=400)
+            if state["lane"] == 0:
+                return self.send_json({"error": "no lane selected"}, status=409)
 
+            on = bool(body.get("on"))
             if path == "/api/mic":
-                lane["mic"] = bool(body.get("on"))
+                state["mic"] = on
                 state["message"] = "Lane %d mic %s" % (
-                    lane["id"], "live" if lane["mic"] else "off")
-
+                    state["lane"], "live" if on else "off")
             else:
-                lane["mute"] = bool(body.get("on"))
+                state["mute"] = on
                 state["message"] = "Lane %d speakers %s" % (
-                    lane["id"], "muted" if lane["mute"] else "on")
+                    state["lane"], "muted" if on else "on")
 
             return self.send_json({"ok": True})
 
@@ -212,7 +217,7 @@ def main():
     server = HTTPServer(("127.0.0.1", port), ConsoleHandler)
     print("Operator Console mock backend on http://127.0.0.1:%d" % port)
     print("Serving %s with %d lane(s), controls %s"
-          % (WWW_ROOT, len(state["lanes"]), state["layout"]))
+          % (WWW_ROOT, state["lanes"], state["layout"]))
 
     try:
         server.serve_forever()

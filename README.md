@@ -156,21 +156,38 @@ npm pack alpinejs@3.15.0 && tar xzf alpinejs-3.15.0.tgz package/dist/cdn.min.js
 cp package/dist/cdn.min.js www/vendor/alpine.min.js
 ```
 
-## Lanes
+## Lanes and audio
 
-A console has **1–8 lanes**. **Mic and speaker state are per-lane; volume is
-not.** There is a single master volume for the whole console.
+A console has **1–8 lanes**. A lane is a **routing destination**, not an audio
+channel — because the hardware has one of everything: one amplifier mute
+(GPIO25), one microphone enable (GPIO24), one master volume.
 
-The mic and speaker controls act on whichever lane is selected, so that card is
-headed `LANE n · MIC & SPEAKERS` and the operator never has to guess what
-they're about to change. The volume readout is captioned `MASTER VOL` for the
-same reason — it sits in the same cluster, so it has to say plainly that it is
-not the selected lane's volume.
+So the model is:
 
-Because the per-lane controls follow the active lane, each lane button carries
-two status dots — mic (green when live) and speakers (amber when un-muted).
-That's the only way to see that another lane is live without switching to it.
-Lane tiles deliberately show no volume figure: there isn't a per-lane one.
+- **Selecting a lane opens it.** The mux points at that lane, the microphone
+  goes live and the speakers un-mute.
+- **Tapping the held lane again releases it.** Mic off, speakers muted — the
+  same state the board boots into. The held tile's label reads `RELEASE`
+  rather than `LANE n`, because tapping again is the only way to let go and
+  that is not otherwise discoverable.
+- **Tapping a different lane** moves straight there; no need to release first.
+- **With no lane held, the mic and speaker buttons are disabled** and
+  `/api/mic` and `/api/mute` return `409 no lane selected`. There is nothing
+  routed to open a microphone into.
+- **Mic and speakers can still be overridden by hand while a lane is held**,
+  which is what lets an operator cut the microphone without giving up the lane.
+  Selecting any lane re-opens both.
+
+Nothing is per-lane, so lane tiles carry no per-lane indicators: the held tile
+shows a `LIVE` pill when the mic is open, and its meter is the only one that
+can move.
+
+Ordering is deliberate wherever the amplifier is touched: **mute first, always**.
+The amp must never be live while the mux is mid-change, and must not come out
+of mute before routing settles — either puts a click through the speakers.
+
+The selected lane is **not** persisted across a restart. A console that came
+back from a power cut with a microphone already open would be a nasty surprise.
 
 **Sizing correction.** The lane count is site-configurable *and* the lane area
 changes shape with the control position, so the grid can't be a fixed template.
@@ -231,40 +248,34 @@ for anything omitted, so a partial response never blanks a control.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `lanes` | array | One object per lane (below) |
-| `lane` | int | Active lane id |
-| `volume` | int | 0–100 — **master volume, console-wide** |
-| `layout` | string | Control position: `left`, `right` or `bottom` |
+| `lanes` | int | Lane **count** at this site (1–8) |
+| `lane` | int | Held lane, 1-based — **0 means none** |
+| `mic` | bool | Microphone enabled (GPIO24) — console-wide |
+| `mute` | bool | Amplifier muted (GPIO25, active high) — console-wide |
+| `level` | int | 0–100 for the meter; 0 when no lane is held |
+| `volume` | int | 0–100 master volume |
 | `brightness` | int | 0–100 |
+| `layout` | string | Control position: `left`, `right` or `bottom` |
+| `hardware` | bool | False when running without a gpiochip |
 | `message` | string | Status line text |
 
-Each entry in `lanes`:
-
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `id` | int | Lane id, 1-based |
-| `mic` | bool | Microphone enabled (GPIO24) |
-| `mute` | bool | Amplifier muted (GPIO25, active high) |
-| `level` | int | 0–100, current level for the meter |
-
-There is no per-lane `volume`. A lane object carrying one is ignored.
+There is no per-lane state at all. `lanes` is a count, not an array.
 
 Commands, all `POST` with a JSON body, all returning `{"ok": true}`:
 
-| Endpoint | Body | Scope |
+| Endpoint | Body | Notes |
 | --- | --- | --- |
-| `/api/lane` | `{"lane": 3}` | Select active lane |
-| `/api/mic` | `{"lane": 3, "on": true}` | Per lane |
-| `/api/mute` | `{"lane": 3, "on": false}` | Per lane |
-| `/api/volume` | `{"value": 65}` | Console — master volume, no lane id |
-| `/api/brightness` | `{"value": 80}` | Console |
-| `/api/lanes` | `{"count": 6}` | Console — set lane count |
-| `/api/layout` | `{"position": "bottom"}` | Console — control position |
+| `/api/lane` | `{"lane": 3}` | Selects and opens. `0` — or the lane already held — releases |
+| `/api/mic` | `{"on": true}` | No lane id. `409` when no lane is held |
+| `/api/mute` | `{"on": false}` | No lane id. `409` when no lane is held |
+| `/api/volume` | `{"value": 65}` | Master volume |
+| `/api/brightness` | `{"value": 80}` | |
+| `/api/lanes` | `{"count": 6}` | Shrinking below the held lane releases it |
+| `/api/layout` | `{"position": "bottom"}` | |
 
-Per-lane commands name their lane explicitly rather than implying "whatever is
-selected", so a command can't land on the wrong lane if a selection races with a
-poll. `/api/volume` carries no lane id at all, which is what makes it
-structurally impossible to apply master volume to one lane by mistake.
+No command except `/api/lane` carries a lane id, which is what makes it
+structurally impossible to apply a console-wide setting to a single lane by
+mistake.
 
 Controls are optimistic: a tap updates the UI immediately, then POSTs. The next
 poll reconciles against the hardware's real state, so a rejected or failed
@@ -359,15 +370,6 @@ lane 1 would be worse than refusing.
   or to move out of the console UI entirely.
 - **What else belongs on the main screen?** There's room beside the audio card,
   and at a single lane most of the screen is free.
-- **Are mic and speakers really per-lane?** This is now the largest open
-  question, because the C application had to take a position to compile at all.
-  The board has ONE amplifier mute (GPIO25) and ONE mic enable (GPIO24), so
-  `main.c` applies only the *active* lane's state to the pins and remembers the
-  rest, re-applying on selection. That is the only coherent reading of a
-  per-lane UI on single-channel hardware. If mic and speakers are meant to be
-  console-wide — as master volume turned out to be — then the per-lane state
-  should collapse to a single pair and the UI should stop drawing per-lane
-  indicators. Worth settling before more is built on this contract.
 - **Should control position be per-operator or per-site?** It is currently one
   device-wide setting, like lane count. If two people share a console on
   different shifts they will fight over it.

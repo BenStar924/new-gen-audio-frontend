@@ -3,10 +3,10 @@
  * Loaded before vendor/alpine.min.js (both deferred, so document order is
  * execution order) and registers the component on alpine:init.
  *
- * State model: the console owns one or more lanes. Mic and speaker state are
- * per-lane and the controls act on whichever lane is active. Volume is NOT
- * per-lane — there is a single master volume for the console, so it lives in
- * console state and is posted without a lane id.
+ * State model: audio is console-wide, because the hardware is — one amplifier
+ * mute, one microphone enable, one master volume. A lane is a routing
+ * destination. Selecting a lane opens the mic and speakers; releasing it (by
+ * tapping it again) closes them. Nothing is per-lane.
  *
  * The backend is the authority. Controls are optimistic: a tap updates local
  * state, renders, then POSTs. GET /api/status once a second reconciles, so a
@@ -17,7 +17,7 @@
 document.addEventListener("alpine:init", function () {
   Alpine.data("operatorConsole", function () {
     return {
-      uiVersion: "0.4.0",
+      uiVersion: "0.5.0",
 
       pollMs: 1000,
       requestTimeoutMs: 2000,
@@ -32,7 +32,15 @@ document.addEventListener("alpine:init", function () {
       maxLanes: 8,
 
       connected: false,
-      lanes: [],
+
+      /* Lanes are just a count — there is no per-lane state to hold. */
+      laneCount: 4,
+      activeLaneId: 0,   /* 0 = no lane selected */
+
+      /* Console-wide audio. */
+      mic: false,
+      mute: true,        /* matches the config.txt boot state */
+      level: 0,
 
       /* Where the mic/speakers/volume cluster sits: "left", "right" or
          "bottom". Operator-configurable, because the panel does not always sit
@@ -42,39 +50,21 @@ document.addEventListener("alpine:init", function () {
       controlsPosition: "right",
       controlsPositions: ["left", "right", "bottom"],
 
-      /* Master volume. One per console, not one per lane. */
       volume: 60,
-
-      activeLaneId: 1,
       brightness: 80,
       message: "Starting…",
       settingsOpen: false,
       backendHost: window.location.host,
 
       init: function () {
-        /* Render something coherent before the first poll lands. Muted matches
-           the config.txt boot state (gpio=25=op,dh — GPIO25 is an active-high
-           mute), so the UI agrees with the hardware at startup instead of
-           contradicting it for the first second. */
-        this.lanes = [this.blankLane(1)];
-
         this.poll();
         setInterval(this.poll.bind(this), this.pollMs);
       },
 
-      blankLane: function (id) {
-        return { id: id, mic: false, mute: true, level: 0 };
-      },
-
-      /* The lane the controls act on. Never undefined: a status response that
-         drops the active lane (because the count shrank) would otherwise blank
-         every binding in the audio card. */
-      get active() {
-        var found = this.lanes.find(function (lane) {
-          return lane.id === this.activeLaneId;
-        }, this);
-
-        return found || this.lanes[0] || this.blankLane(this.activeLaneId);
+      /* True while a lane is held. The mic and speaker controls do nothing
+         without one — there is nothing routed to open a microphone into. */
+      get hasLane() {
+        return this.activeLaneId >= 1;
       },
 
       /* Column count that squares up best for the current lane count. Paired
@@ -91,7 +81,7 @@ document.addEventListener("alpine:init", function () {
         var narrow = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3 };
 
         var byCount = this.controlsPosition === "bottom" ? wide : narrow;
-        return byCount[this.lanes.length] || Math.ceil(Math.sqrt(this.lanes.length));
+        return byCount[this.laneCount] || Math.ceil(Math.sqrt(this.laneCount));
       },
 
       /* True only when the control cluster is actually a bottom rail. At a
@@ -99,30 +89,28 @@ document.addEventListener("alpine:init", function () {
          to sit below — it would strand itself at the top of an empty screen.
          The cluster falls back to the stacked, centred card instead. */
       get railMode() {
-        return this.controlsPosition === "bottom" && this.lanes.length > 1;
+        return this.controlsPosition === "bottom" && this.laneCount > 1;
       },
 
       /* ---------- Meter ---------- */
 
-      /* Small meter inside each lane tile. Same rule as the big meter, applied
-         to any lane rather than the active one — that is what makes a live
-         lane visible without selecting it. */
-      tileSegmentClass: function (lane, index) {
-        var level = lane.mute ? 0 : lane.level;
-        var lit = Math.round((level / 100) * this.tileSegments);
-        var isActive = lane.id === this.activeLaneId;
+      /* Meter inside a lane tile. Only the held lane can have a level: there
+         is one microphone, so an unselected lane is not carrying anything. */
+      tileSegmentClass: function (laneId, index) {
+        var lit = (laneId === this.activeLaneId && !this.mute)
+                    ? Math.round((this.level / 100) * this.tileSegments)
+                    : 0;
 
-        if (index >= lit) return isActive ? "bg-navy-d" : "bg-line-d";
-        if (index / this.tileSegments >= 0.75) {
-          return isActive ? "bg-[#E4A034]" : "bg-warn";
+        if (index >= lit) {
+          return laneId === this.activeLaneId ? "bg-navy-d" : "bg-line-d";
         }
-        return isActive ? "bg-[#3FBF77]" : "bg-on";
+        return index / this.tileSegments >= 0.75 ? "bg-[#E4A034]" : "bg-[#3FBF77]";
       },
 
       meterSegmentClass: function (index) {
         /* A muted amplifier shows no level whatever the input is doing — the
            meter reports what reaches the speakers, not what reaches the ADC. */
-        var level = this.active.mute ? 0 : this.active.level;
+        var level = (this.hasLane && !this.mute) ? this.level : 0;
         var lit = Math.round((level / 100) * this.meterSegments);
 
         if (index >= lit) return "bg-line-d";
@@ -189,72 +177,56 @@ document.addEventListener("alpine:init", function () {
       applyStatus: function (data) {
         if (!data || typeof data !== "object") return;
 
-        if (Array.isArray(data.lanes) && data.lanes.length) {
-          this.lanes = data.lanes.map(function (lane, index) {
-            var base = this.blankLane(typeof lane.id === "number" ? lane.id : index + 1);
-
-            if (typeof lane.mic === "boolean") base.mic = lane.mic;
-            if (typeof lane.mute === "boolean") base.mute = lane.mute;
-            if (typeof lane.level === "number") base.level = clamp(lane.level, 0, 100);
-
-            return base;
-          }, this);
+        if (typeof data.lanes === "number") {
+          this.laneCount = clamp(data.lanes, this.minLanes, this.maxLanes);
         }
+        if (typeof data.lane === "number")       this.activeLaneId = data.lane;
+        if (typeof data.mic === "boolean")       this.mic = data.mic;
+        if (typeof data.mute === "boolean")      this.mute = data.mute;
+        if (typeof data.level === "number")      this.level = clamp(data.level, 0, 100);
+        if (typeof data.volume === "number")     this.volume = clamp(data.volume, 0, 100);
+        if (typeof data.brightness === "number") this.brightness = clamp(data.brightness, 0, 100);
+        if (typeof data.message === "string")    this.message = data.message;
 
-        if (typeof data.lane === "number") this.activeLaneId = data.lane;
-        if (typeof data.volume === "number") this.volume = clamp(data.volume, 0, 100);
         if (this.controlsPositions.indexOf(data.layout) !== -1) {
           this.controlsPosition = data.layout;
-        }
-        if (typeof data.brightness === "number") this.brightness = clamp(data.brightness, 0, 100);
-        if (typeof data.message === "string") this.message = data.message;
-
-        this.ensureActiveLaneExists();
-      },
-
-      /* The lane count is operator-editable, so the active lane can vanish from
-         under the controls. Fall back to the highest remaining lane. */
-      ensureActiveLaneExists: function () {
-        var exists = this.lanes.some(function (lane) {
-          return lane.id === this.activeLaneId;
-        }, this);
-
-        if (!exists && this.lanes.length) {
-          this.activeLaneId = this.lanes[this.lanes.length - 1].id;
         }
       },
 
       /* ---------- Actions ---------- */
 
+      /* Selecting a lane opens the mic and speakers; tapping the lane already
+         held releases it and closes them. The backend owns that rule — the UI
+         posts the tap and lets the next poll tell it what happened. */
       selectLane: function (id) {
-        this.activeLaneId = id;
-        this.message = "Lane " + id + " selected";
-        this.post("/api/lane", { lane: id });
-      },
+        var release = (id === this.activeLaneId);
 
-      setControlsPosition: function (position) {
-        if (this.controlsPositions.indexOf(position) === -1) return;
+        this.activeLaneId = release ? 0 : id;
+        this.mic  = !release;
+        this.mute = release;
+        this.message = release ? "No lane selected" : "Lane " + id + " live";
 
-        this.controlsPosition = position;
-        this.message = "Controls moved to " + position;
-        this.post("/api/layout", { position: position });
+        this.post("/api/lane", { lane: release ? 0 : id });
       },
 
       toggleMic: function () {
-        var lane = this.active;
-        lane.mic = !lane.mic;
-        this.message = "Lane " + lane.id + " mic " + (lane.mic ? "live" : "off");
-        this.post("/api/mic", { lane: lane.id, on: lane.mic });
+        if (!this.hasLane) return;
+
+        this.mic = !this.mic;
+        this.message = "Lane " + this.activeLaneId + " mic " +
+                       (this.mic ? "live" : "off");
+        this.post("/api/mic", { on: this.mic });
       },
 
       toggleMute: function () {
-        var lane = this.active;
-        lane.mute = !lane.mute;
-        this.message = "Lane " + lane.id + " speakers " + (lane.mute ? "muted" : "on");
-        this.post("/api/mute", { lane: lane.id, on: lane.mute });
+        if (!this.hasLane) return;
+
+        this.mute = !this.mute;
+        this.message = "Lane " + this.activeLaneId + " speakers " +
+                       (this.mute ? "muted" : "on");
+        this.post("/api/mute", { on: this.mute });
       },
 
-      /* Master volume — console-wide, so no lane id goes with it. */
       nudgeVolume: function (delta) {
         this.volume = clamp(this.volume + delta, 0, 100);
         this.post("/api/volume", { value: this.volume });
@@ -265,22 +237,19 @@ document.addEventListener("alpine:init", function () {
         this.post("/api/brightness", { value: this.brightness });
       },
 
-      /* Changing the site's lane count. The backend owns the real list — it has
-         to add or drop hardware state — so this posts the count and lets the
-         next poll deliver the authoritative lanes. */
+      /* Changing the site's lane count. The backend owns the real value and
+         releases the held lane if it disappears. */
       setLaneCount: function (count) {
         count = clamp(count, this.minLanes, this.maxLanes);
-        if (count === this.lanes.length) return;
+        if (count === this.laneCount) return;
 
-        if (count < this.lanes.length) {
-          this.lanes = this.lanes.slice(0, count);
-        } else {
-          while (this.lanes.length < count) {
-            this.lanes.push(this.blankLane(this.lanes.length + 1));
-          }
+        this.laneCount = count;
+        if (this.activeLaneId > count) {
+          this.activeLaneId = 0;
+          this.mic = false;
+          this.mute = true;
         }
 
-        this.ensureActiveLaneExists();
         this.message = count + (count === 1 ? " lane" : " lanes") + " configured";
         this.post("/api/lanes", { count: count });
       }

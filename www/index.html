@@ -59,51 +59,43 @@
 
     <!-- Lane selector. Hidden at a single lane: a one-option selector is noise,
          and the audio card takes the space instead. -->
-    <section x-show="lanes.length > 1"
+    <section x-show="laneCount > 1"
              class="flex flex-col min-h-0 min-w-0 flex-1 gap-2 p-2.5 bg-surface border-2 border-line rounded-xl"
              aria-labelledby="lanes-heading">
       <h2 id="lanes-heading" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim">Lane</h2>
 
       <div class="lane-grid flex-1 min-h-0" :style="`--lane-cols: ${laneColumns}`">
-        <template x-for="lane in lanes" :key="lane.id">
+        <template x-for="id in laneCount" :key="id">
           <button type="button"
-                  :aria-label="`Lane ${lane.id}`"
-                  :aria-pressed="lane.id === activeLaneId"
-                  x-on:pointerup.prevent.throttle.250ms="selectLane(lane.id)"
+                  :aria-label="`Lane ${id}`"
+                  :aria-pressed="id === activeLaneId"
+                  x-on:pointerup.prevent.throttle.250ms="selectLane(id)"
                   class="lane-btn raised flex flex-col justify-between min-h-16 px-2.5 py-2 rounded-lg border-2 cursor-pointer"
-                  :class="lane.id === activeLaneId
+                  :class="id === activeLaneId
                             ? 'bg-navy border-navy-d text-white shadow-[0_4px_0_var(--color-navy-d)]'
                             : 'bg-alt border-line text-txt'">
-            <span class="flex items-start justify-end gap-2">
-              <!-- Per-lane status at a glance. With the controls following the
-                   active lane, this is the only way to see that another lane is
-                   live without switching to it. Volume is not here: it is a
-                   single console-wide master, not a per-lane value. -->
-              <span class="flex items-center gap-1.5" aria-hidden="true">
-                <span class="w-2.5 h-2.5 rounded-full"
-                      :class="lane.mic ? (lane.id === activeLaneId ? 'bg-[#6EE7A5]' : 'bg-on')
-                                       : (lane.id === activeLaneId ? 'bg-white/30' : 'bg-line')"></span>
-                <span class="w-2.5 h-2.5 rounded-full"
-                      :class="!lane.mute ? (lane.id === activeLaneId ? 'bg-[#F0B860]' : 'bg-warn')
-                                         : (lane.id === activeLaneId ? 'bg-white/30' : 'bg-line')"></span>
-              </span>
+            <!-- LIVE only on the held lane: there is one microphone, so no
+                 other lane can be carrying anything. -->
+            <span class="flex items-start justify-end h-4">
+              <span x-show="id === activeLaneId && mic"
+                    class="px-1.5 py-0.5 rounded-full bg-on text-white text-[8px] font-extrabold tracking-[0.1em]">LIVE</span>
             </span>
 
             <span class="flex flex-col items-center leading-none">
-              <span class="text-3xl font-extrabold" x-text="lane.id"></span>
-              <!-- Dropped when the bottom rail squeezes the grid into more than
-                   one row: the numeral already identifies the lane, and the
-                   label is the first thing worth losing to keep tiles whole. -->
-              <span x-show="!(railMode && lanes.length > laneColumns)"
+              <span class="text-3xl font-extrabold" x-text="id"></span>
+              <!-- The held lane says how to let go of it. Tapping it again is
+                   the only way to release, and that is not discoverable
+                   otherwise. Dropped when the bottom rail squeezes the grid
+                   into more than one row and tiles get tight. -->
+              <span x-show="!(railMode && laneCount > laneColumns)"
                     class="mt-1 text-[9px] font-extrabold tracking-[0.14em]"
-                    :class="lane.id === activeLaneId ? 'text-navy-tint' : 'text-dim'"
-                    x-text="`LANE ${lane.id}`"></span>
+                    :class="id === activeLaneId ? 'text-navy-tint' : 'text-dim'"
+                    x-text="id === activeLaneId ? 'RELEASE' : `LANE ${id}`"></span>
             </span>
 
-            <!-- Per-lane meter, so a live lane is visible without selecting it. -->
             <span class="flex gap-[2px] h-1.5" aria-hidden="true">
               <template x-for="seg in tileSegments" :key="seg">
-                <span class="flex-1 rounded-[1px]" :class="tileSegmentClass(lane, seg)"></span>
+                <span class="flex-1 rounded-[1px]" :class="tileSegmentClass(id, seg)"></span>
               </template>
             </span>
           </button>
@@ -116,16 +108,17 @@
          change. -->
     <section class="flex min-h-0 gap-2.5 p-2.5 bg-surface border-2 border-line rounded-xl shrink-0"
              :class="railMode ? 'w-full flex-row items-stretch'
-                     : lanes.length > 1 ? 'w-76 flex-col' : 'w-full max-w-2xl mx-auto flex-1 flex-col'"
+                     : laneCount > 1 ? 'w-76 flex-col' : 'w-full max-w-2xl mx-auto flex-1 flex-col'"
              aria-labelledby="controls-heading">
       <h2 id="controls-heading" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim shrink-0"
           :class="railMode ? '[writing-mode:vertical-rl] rotate-180 text-center' : ''">
-        <!-- Short form in the bottom rail: there the heading is rotated, so its
-             text length is the rail's height, and a long one squeezes the lane
-             grid until tiles clip. -->
-        <span x-text="railMode
-                        ? (lanes.length > 1 ? `Lane ${activeLaneId}` : 'Audio')
-                        : (lanes.length > 1 ? `Lane ${activeLaneId} · Mic &amp; speakers` : 'Mic &amp; speakers')">Mic &amp; speakers</span>
+        <!-- Short form in the bottom rail: there the heading is rotated, so
+             its text length is the rail's height, and a long one squeezes the
+             lane grid until tiles clip. -->
+        <span x-text="!hasLane
+                        ? 'No lane selected'
+                        : (railMode ? `Lane ${activeLaneId}`
+                                    : `Lane ${activeLaneId} · Mic &amp; speakers`)">No lane selected</span>
       </h2>
 
       <!-- One markup for all three positions: only the flex direction of this
@@ -133,36 +126,36 @@
       <div class="flex gap-2.5" :class="railMode ? 'flex-row items-stretch flex-1' : 'flex-col'">
 
         <div class="flex gap-2.5" :class="railMode ? 'flex-1' : ''">
-          <button type="button" aria-label="Microphone" :aria-pressed="active.mic"
+          <button type="button" aria-label="Microphone" :aria-pressed="mic" :disabled="!hasLane"
                   x-on:pointerup.prevent.throttle.250ms="toggleMic()"
-                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer"
-                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (active.mic ? 'bg-on border-on-d text-white shadow-[0_4px_0_var(--color-on-d)]'
+                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer disabled:opacity-45"
+                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (mic ? 'bg-on border-on-d text-white shadow-[0_4px_0_var(--color-on-d)]'
                                      : 'bg-alt border-line text-txt')">
             <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/>
               <path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2Z"/>
             </svg>
-            <span class="text-xs" :class="active.mic ? 'text-white/85' : 'text-dim'">Mic</span>
-            <span class="text-[15px] font-extrabold tracking-wide" x-text="active.mic ? 'LIVE' : 'OFF'">OFF</span>
+            <span class="text-xs" :class="mic ? 'text-white/85' : 'text-dim'">Mic</span>
+            <span class="text-[15px] font-extrabold tracking-wide" x-text="mic ? 'LIVE' : 'OFF'">OFF</span>
           </button>
 
-          <button type="button" aria-label="Speakers" :aria-pressed="active.mute"
+          <button type="button" aria-label="Speakers" :aria-pressed="mute" :disabled="!hasLane"
                   x-on:pointerup.prevent.throttle.250ms="toggleMute()"
-                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer"
-                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (!active.mute ? 'bg-warn border-warn-d text-white shadow-[0_4px_0_var(--color-warn-d)]'
+                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer disabled:opacity-45"
+                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (!mute ? 'bg-warn border-warn-d text-white shadow-[0_4px_0_var(--color-warn-d)]'
                                        : 'bg-alt border-line text-txt')">
             <!-- The glyph tracks the state so it can never contradict the label. -->
-            <svg x-show="active.mute" class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+            <svg x-show="mute" class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 9v6h4l5 5V4L8 9H4Z"/>
               <path d="m21.2 12 2.1-2.1-1.4-1.4-2.1 2.1-2.1-2.1-1.4 1.4 2.1 2.1-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4-2.1-2.1Z"/>
             </svg>
-            <svg x-show="!active.mute" class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+            <svg x-show="!mute" class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 9v6h4l5 5V4L8 9H4Z"/>
               <path d="M16 7.5a5 5 0 0 1 0 9v-2a3 3 0 0 0 0-5v-2Z"/>
               <path d="M16 3a9 9 0 0 1 0 18v-2a7 7 0 0 0 0-14V3Z"/>
             </svg>
-            <span class="text-xs" :class="!active.mute ? 'text-white/85' : 'text-dim'">Speakers</span>
-            <span class="text-[15px] font-extrabold tracking-wide" x-text="active.mute ? 'MUTED' : 'ON'">MUTED</span>
+            <span class="text-xs" :class="!mute ? 'text-white/85' : 'text-dim'">Speakers</span>
+            <span class="text-[15px] font-extrabold tracking-wide" x-text="mute ? 'MUTED' : 'ON'">MUTED</span>
           </button>
         </div>
 
@@ -239,12 +232,12 @@
           <span class="text-xs text-dim" x-text="`${minLanes}–${maxLanes}`"></span>
         </div>
         <div class="flex items-center gap-2.5">
-          <button type="button" aria-label="Fewer lanes" :disabled="lanes.length <= minLanes"
-                  x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length - 1)"
+          <button type="button" aria-label="Fewer lanes" :disabled="laneCount <= minLanes"
+                  x-on:pointerup.prevent.throttle.150ms="setLaneCount(laneCount - 1)"
                   class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
-          <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="lanes.length"></span>
-          <button type="button" aria-label="More lanes" :disabled="lanes.length >= maxLanes"
-                  x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length + 1)"
+          <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="laneCount"></span>
+          <button type="button" aria-label="More lanes" :disabled="laneCount >= maxLanes"
+                  x-on:pointerup.prevent.throttle.150ms="setLaneCount(laneCount + 1)"
                   class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">+</button>
         </div>
       </div>

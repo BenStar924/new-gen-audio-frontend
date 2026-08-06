@@ -156,39 +156,33 @@ static mhd_result_t send_error(struct MHD_Connection *conn, unsigned int status,
 
 static mhd_result_t handle_status(struct MHD_Connection *conn)
 {
-    char json[2048];
-    size_t n = 0;
+    char json[1024];
 
-    /* One reading per request, applied to the active lane. There is one
-     * microphone, so only the selected lane can have a level; the rest report
-     * null and the UI draws them empty. */
+    /* Audio is console-wide — one mic, one amplifier — so there is one reading,
+     * and it only means anything while a lane is held. */
     int level = hw_audio_level();
+    if (level < 0) {
+        level = 0;
+    }
 
     console_lock();
     console_state_t *s = console_state();
 
-    n += (size_t)snprintf(json + n, sizeof(json) - n, "{\"lanes\":[");
-    for (int i = 0; i < s->lane_count; i++) {
-        int lane_level = (i + 1 == s->active_lane) ? level : 0;
-        if (lane_level < 0) {
-            lane_level = 0;
-        }
-
-        n += (size_t)snprintf(json + n, sizeof(json) - n,
-                              "%s{\"id\":%d,\"mic\":%s,\"mute\":%s,\"level\":%d}",
-                              i ? "," : "", i + 1,
-                              s->lanes[i].mic ? "true" : "false",
-                              s->lanes[i].mute ? "true" : "false",
-                              lane_level);
+    if (s->active_lane == CONSOLE_NO_LANE || s->mute) {
+        level = 0;
     }
 
-    n += (size_t)snprintf(json + n, sizeof(json) - n,
-                          "],\"lane\":%d,\"volume\":%d,\"brightness\":%d,"
-                          "\"layout\":\"%s\",\"hardware\":%s,\"message\":\"%s\"}",
-                          s->active_lane, s->volume, s->brightness,
-                          console_layout_name(s->layout),
-                          hw_present() ? "true" : "false",
-                          s->message);
+    snprintf(json, sizeof(json),
+             "{\"lanes\":%d,\"lane\":%d,\"mic\":%s,\"mute\":%s,"
+             "\"level\":%d,\"volume\":%d,\"brightness\":%d,"
+             "\"layout\":\"%s\",\"hardware\":%s,\"message\":\"%s\"}",
+             s->lane_count, s->active_lane,
+             s->mic ? "true" : "false",
+             s->mute ? "true" : "false",
+             level, s->volume, s->brightness,
+             console_layout_name(s->layout),
+             hw_present() ? "true" : "false",
+             s->message);
     console_unlock();
 
     return send_json(conn, MHD_HTTP_OK, json);
@@ -207,21 +201,22 @@ static mhd_result_t handle_command(struct MHD_Connection *conn, const char *url,
     console_lock();
 
     if (strcmp(url, "/api/lane") == 0) {
+        /* 0 releases the lane; so does re-selecting the one already held. */
         rc = (json_int(body, "lane", &value) && console_select_lane(value) == 0)
                  ? send_ok(conn)
                  : send_error(conn, MHD_HTTP_BAD_REQUEST, "no such lane");
 
     } else if (strcmp(url, "/api/mic") == 0) {
-        rc = (json_int(body, "lane", &value) && json_bool(body, "on", &on) &&
-              console_set_mic(value, on) == 0)
+        /* No lane id: there is one microphone enable, and it only opens while
+         * a lane is held. */
+        rc = (json_bool(body, "on", &on) && console_set_mic(on) == 0)
                  ? send_ok(conn)
-                 : send_error(conn, MHD_HTTP_BAD_REQUEST, "no such lane");
+                 : send_error(conn, MHD_HTTP_CONFLICT, "no lane selected");
 
     } else if (strcmp(url, "/api/mute") == 0) {
-        rc = (json_int(body, "lane", &value) && json_bool(body, "on", &on) &&
-              console_set_mute(value, on) == 0)
+        rc = (json_bool(body, "on", &on) && console_set_mute(on) == 0)
                  ? send_ok(conn)
-                 : send_error(conn, MHD_HTTP_BAD_REQUEST, "no such lane");
+                 : send_error(conn, MHD_HTTP_CONFLICT, "no lane selected");
 
     } else if (strcmp(url, "/api/volume") == 0) {
         /* Master volume: no lane id, which is what makes it structurally

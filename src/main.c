@@ -4,21 +4,16 @@
  * the HTTP server that serves www/ and the /api endpoints, then waits. All the
  * interesting behaviour is in webserver.c (HTTP) and hardware/ (pins).
  *
- * A note on the lane model, because it is the one place where the UI and the
- * hardware do not obviously agree:
+ * The lane model, which the hardware dictates:
  *
- * The UI keeps mic and mute state for every lane. The board has ONE amplifier
- * mute (GPIO25) and ONE microphone enable (GPIO24). So only the ACTIVE lane's
- * state can be physically applied; the other lanes' settings are remembered
- * and applied when that lane is selected. Selecting a lane therefore does
- * three things: it moves the mux, then it pushes that lane's remembered mic
- * and mute state onto the single pair of control lines.
+ * There is ONE amplifier mute (GPIO25), ONE microphone enable (GPIO24) and one
+ * master volume. So audio state is console-wide, not per-lane. A lane is a
+ * routing destination: selecting one points the mux at it and opens the mic
+ * and speakers; releasing it closes them again. With no lane selected the
+ * board sits exactly as it boots — mic off, amplifier muted.
  *
- * That is the only coherent reading of a per-lane UI on single-channel
- * hardware, and it is worth confirming against the actual wiring: if mic and
- * speakers are meant to be console-wide — as master volume turned out to be —
- * then the per-lane state here should collapse to a single pair and the UI
- * should stop drawing per-lane indicators.
+ * Mic and speakers can still be overridden by hand while a lane is held, which
+ * is what lets an operator cut the microphone without giving up the lane.
  */
 
 #include "console.h"
@@ -74,63 +69,80 @@ static void set_message(const char *fmt, ...)
     va_end(ap);
 }
 
-/* Pushes the given lane's remembered state onto the single mic/mute pair. */
-static void apply_active_lane(void)
+/* Pushes console state onto the pins in an order that cannot pop the speakers.
+ *
+ * Mute first, always. The amplifier must never be live while the mux is
+ * mid-change, and it must never come out of mute before the routing is
+ * settled — either would put a click through the speakers. */
+static void apply_audio(void)
 {
-    const lane_t *lane = &g_state.lanes[g_state.active_lane - 1];
-
-    /* Mute first when muting, un-mute last when un-muting: the amplifier
-     * should never be live while the mux is mid-change. */
     hw_set_mute(true);
+
+    if (g_state.active_lane == CONSOLE_NO_LANE) {
+        hw_set_mic(false);
+        hw_set_led(false);
+        return;
+    }
+
     hw_select_lane(g_state.active_lane);
-    hw_set_mic(lane->mic);
-    hw_set_mute(lane->mute);
-    hw_set_led(lane->mic);
+    hw_set_mic(g_state.mic);
+    hw_set_mute(g_state.mute);
+    hw_set_led(g_state.mic);
 }
 
 int console_select_lane(int lane)
 {
-    if (lane < 1 || lane > g_state.lane_count) {
+    if (lane < CONSOLE_NO_LANE || lane > g_state.lane_count) {
         return -1;
+    }
+
+    /* Tapping the lane already selected releases it. */
+    if (lane == g_state.active_lane) {
+        lane = CONSOLE_NO_LANE;
     }
 
     g_state.active_lane = lane;
-    apply_active_lane();
-    set_message("Lane %d active", lane);
+
+    if (lane == CONSOLE_NO_LANE) {
+        /* Releasing closes everything: mic off, speakers muted. */
+        g_state.mic  = false;
+        g_state.mute = true;
+        apply_audio();
+        set_message("No lane selected");
+    } else {
+        /* Selecting opens them. */
+        g_state.mic  = true;
+        g_state.mute = false;
+        apply_audio();
+        set_message("Lane %d live", lane);
+    }
+
     return 0;
 }
 
-int console_set_mic(int lane, bool live)
+int console_set_mic(bool live)
 {
-    if (lane < 1 || lane > g_state.lane_count) {
-        return -1;
+    if (g_state.active_lane == CONSOLE_NO_LANE) {
+        return -1;  /* nothing routed to open a microphone into */
     }
 
-    g_state.lanes[lane - 1].mic = live;
-
-    /* Only the active lane reaches the hardware — there is one mic enable. */
-    if (lane == g_state.active_lane) {
-        hw_set_mic(live);
-        hw_set_led(live);
-    }
-
-    set_message("Lane %d mic %s", lane, live ? "live" : "off");
+    g_state.mic = live;
+    hw_set_mic(live);
+    hw_set_led(live);
+    set_message("Lane %d mic %s", g_state.active_lane, live ? "live" : "off");
     return 0;
 }
 
-int console_set_mute(int lane, bool muted)
+int console_set_mute(bool muted)
 {
-    if (lane < 1 || lane > g_state.lane_count) {
+    if (g_state.active_lane == CONSOLE_NO_LANE) {
         return -1;
     }
 
-    g_state.lanes[lane - 1].mute = muted;
-
-    if (lane == g_state.active_lane) {
-        hw_set_mute(muted);
-    }
-
-    set_message("Lane %d speakers %s", lane, muted ? "muted" : "on");
+    g_state.mute = muted;
+    hw_set_mute(muted);
+    set_message("Lane %d speakers %s", g_state.active_lane,
+                muted ? "muted" : "on");
     return 0;
 }
 
@@ -172,18 +184,17 @@ int console_set_lane_count(int count)
         return -1;
     }
 
-    /* Lanes appearing start in the safe state: mic off, speakers muted. */
-    for (int i = g_state.lane_count; i < count; i++) {
-        g_state.lanes[i].mic   = false;
-        g_state.lanes[i].mute  = true;
-        g_state.lanes[i].level = -1;
-    }
-
     g_state.lane_count = count;
 
-    /* The active lane can be the one that just disappeared. */
+    /* The selected lane can be the one that just disappeared. Release rather
+     * than silently re-point: the operator chose a lane that no longer exists,
+     * and moving a live microphone to a different one without being asked is
+     * the wrong recovery. */
     if (g_state.active_lane > count) {
-        console_select_lane(count);
+        g_state.active_lane = CONSOLE_NO_LANE;
+        g_state.mic  = false;
+        g_state.mute = true;
+        apply_audio();
     }
 
     set_message("%d lane%s configured", count, count == 1 ? "" : "s");
@@ -269,20 +280,18 @@ static void on_signal(int sig)
 
 static void defaults(void)
 {
-    /* Muted matches the config.txt boot state (gpio=25=op,dh), so the console
-     * agrees with the hardware from the first byte it serves. */
-    for (int i = 0; i < CONSOLE_MAX_LANES; i++) {
-        g_state.lanes[i].mic   = false;
-        g_state.lanes[i].mute  = true;
-        g_state.lanes[i].level = -1;
-    }
-
+    /* No lane selected, mic off, amplifier muted — matching the config.txt
+     * boot state (gpio=25=op,dh), so the console agrees with the hardware from
+     * the first byte it serves. */
     g_state.lane_count  = 4;
-    g_state.active_lane = 1;
+    g_state.active_lane = CONSOLE_NO_LANE;
+    g_state.mic         = false;
+    g_state.mute        = true;
+    g_state.level       = -1;
     g_state.volume      = 60;
     g_state.brightness  = 80;
     g_state.layout      = LAYOUT_RIGHT;
-    snprintf(g_state.message, sizeof(g_state.message), "Starting…");
+    snprintf(g_state.message, sizeof(g_state.message), "No lane selected");
 }
 
 static void usage(const char *argv0)
@@ -331,7 +340,7 @@ int main(int argc, char **argv)
     /* Bring the board to match the state we just restored. */
     hw_set_brightness(g_state.brightness);
     hw_set_volume(g_state.volume);
-    apply_active_lane();
+    apply_audio();
 
     if (webserver_start(port, www) < 0) {
         fprintf(stderr, "operatorconsole: could not start HTTP server on port %u\n",
