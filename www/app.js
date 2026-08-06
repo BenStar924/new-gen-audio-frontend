@@ -1,338 +1,259 @@
-/* Operator Console — UI logic.
+/* Operator Console — Alpine component.
  *
- * Vanilla ES2020, no framework, no build step. Served by libmicrohttpd from
- * www/ and rendered by Cog/WPE.
+ * Loaded before vendor/alpine.min.js (both deferred, so document order is
+ * execution order) and registers the component on alpine:init.
  *
- * Shape of the code:
- *   state      — the single source of truth, mirrored from the backend
- *   render()   — writes state to the DOM; never reads from it
- *   bindTap()  — pointerup + debounce (click is unreliable under WPE)
- *   poll()     — GET /api/status on an interval, reconciles state
+ * State model: the console owns one or more lanes, and the audio controls act
+ * on whichever lane is active. Every lane therefore carries its own mic, mute,
+ * volume and level — there is no console-wide audio state.
  *
- * Every control is optimistic: it updates state locally, renders, then POSTs.
- * The next poll reconciles against the hardware's real state, so a rejected
- * command corrects itself within one poll interval rather than leaving the UI
- * lying about the amplifier.
+ * The backend is the authority. Controls are optimistic: a tap updates local
+ * state, renders, then POSTs. GET /api/status once a second reconciles, so a
+ * rejected or failed command self-corrects within a poll interval rather than
+ * leaving the UI lying about the amplifier.
  */
 
-(function () {
-  "use strict";
+document.addEventListener("alpine:init", function () {
+  Alpine.data("operatorConsole", function () {
+    return {
+      uiVersion: "0.2.0",
 
-  var UI_VERSION = "0.1.0";
-  var POLL_MS = 1000;
-  var TAP_DEBOUNCE_MS = 250;
-  var METER_SEGMENTS = 24;
-  var VOLUME_STEP = 5;
-  var BRIGHTNESS_STEP = 10;
+      pollMs: 1000,
+      requestTimeoutMs: 2000,
+      meterSegments: 24,
+      volumeStep: 5,
+      brightnessStep: 10,
 
-  var state = {
-    connected: false,
-    lanes: 8,
-    lane: 1,
-    mic: false,
-    mute: true,        // matches the config.txt boot state: GPIO25 high = muted
-    volume: 60,
-    brightness: 80,
-    level: 0,          // 0..100, most recent input level
-    message: "Starting…",
-    settingsOpen: false
-  };
+      /* At least one lane per console; 8 is the panel's practical ceiling
+         before lane buttons stop being comfortable finger targets. */
+      minLanes: 1,
+      maxLanes: 8,
 
-  var el = {};
+      connected: false,
+      lanes: [],
+      activeLaneId: 1,
+      brightness: 80,
+      message: "Starting…",
+      settingsOpen: false,
+      backendHost: window.location.host,
 
-  /* ---------- DOM helpers ---------- */
+      init: function () {
+        /* Render something coherent before the first poll lands. Muted matches
+           the config.txt boot state (gpio=25=op,dh — GPIO25 is an active-high
+           mute), so the UI agrees with the hardware at startup instead of
+           contradicting it for the first second. */
+        this.lanes = [this.blankLane(1)];
 
-  function byId(id) {
-    return document.getElementById(id);
-  }
+        this.poll();
+        setInterval(this.poll.bind(this), this.pollMs);
+      },
 
-  function cacheElements() {
-    [
-      "status-pill", "status-text", "btn-settings",
-      "lane-grid",
-      "btn-mic", "btn-mute",
-      "btn-vol-down", "btn-vol-up", "volume-value", "level-meter",
-      "footer-msg", "footer-version",
-      "settings-overlay", "btn-settings-close", "btn-reload",
-      "btn-bright-down", "btn-bright-up", "brightness-value",
-      "settings-backend", "settings-version"
-    ].forEach(function (id) {
-      el[id] = byId(id);
-    });
-  }
+      blankLane: function (id) {
+        return { id: id, mic: false, mute: true, volume: 60, level: 0 };
+      },
 
-  /* ---------- Input ---------- */
+      /* The lane the controls act on. Never undefined: a status response that
+         drops the active lane (because the count shrank) would otherwise blank
+         every binding in the audio card. */
+      get active() {
+        var found = this.lanes.find(function (lane) {
+          return lane.id === this.activeLaneId;
+        }, this);
 
-  /* Bind a tap handler.
-   *
-   * pointerup fires for both mouse (bench, under cage) and touch (production)
-   * under WPE, where click does not fire reliably. The debounce guards against
-   * a panel that reports a single tap as several pointer events — without it a
-   * latching control can toggle twice and appear not to respond at all. */
-  function bindTap(node, handler) {
-    if (!node) return;
-    var last = 0;
+        return found || this.lanes[0] || this.blankLane(this.activeLaneId);
+      },
 
-    node.addEventListener("pointerup", function (event) {
-      var now = Date.now();
-      if (now - last < TAP_DEBOUNCE_MS) return;
-      last = now;
+      /* Column count that squares up best for the current lane count on a
+         landscape panel. Paired with the flex-grow rule in input.css, a final
+         row holding fewer lanes than this stretches to fill the width, so odd
+         counts read as deliberate instead of ragged.
+             1→1  2→2  3→3  4→2  5→3  6→3  7→4  8→4 */
+      get laneColumns() {
+        var byCount = { 1: 1, 2: 2, 3: 3, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4 };
+        return byCount[this.lanes.length] || Math.ceil(Math.sqrt(this.lanes.length));
+      },
 
-      event.preventDefault();
-      handler(event);
-    });
+      /* ---------- Meter ---------- */
 
-    /* Held-down feedback without :active, which sticks on some touch panels
-       when the pointer is cancelled mid-press. */
-    node.addEventListener("pointerdown", function () {
-      node.classList.add("is-pressed");
-    });
-    ["pointerup", "pointercancel", "pointerleave"].forEach(function (name) {
-      node.addEventListener(name, function () {
-        node.classList.remove("is-pressed");
-      });
-    });
-  }
+      meterSegmentClass: function (index) {
+        /* A muted amplifier shows no level whatever the input is doing — the
+           meter reports what reaches the speakers, not what reaches the ADC. */
+        var level = this.active.mute ? 0 : this.active.level;
+        var lit = Math.round((level / 100) * this.meterSegments);
 
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
+        if (index >= lit) return "bg-surface-hi";
 
-  /* ---------- Backend ---------- */
+        var position = index / this.meterSegments;
+        if (position >= 0.85) return "bg-danger";
+        if (position >= 0.7) return "bg-warn";
+        return "bg-on";
+      },
 
-  /* All requests are same-origin against 127.0.0.1 and must fail fast: a hung
-     request would stack up behind the poll interval. */
-  function request(path, options) {
-    var controller = new AbortController();
-    var timer = setTimeout(function () {
-      controller.abort();
-    }, 2000);
+      /* ---------- Backend ---------- */
 
-    var init = Object.assign({ signal: controller.signal }, options || {});
+      /* Same-origin against 127.0.0.1, and must fail fast: a hung request would
+         stack up behind the poll interval. */
+      request: function (path, options) {
+        var controller = new AbortController();
+        var timer = setTimeout(function () {
+          controller.abort();
+        }, this.requestTimeoutMs);
 
-    return fetch(path, init)
-      .then(function (response) {
-        if (!response.ok) throw new Error(path + " -> " + response.status);
-        return response.json();
-      })
-      .finally(function () {
-        clearTimeout(timer);
-      });
-  }
+        var init = Object.assign({ signal: controller.signal }, options || {});
 
-  function post(path, body) {
-    return request(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }).catch(function (error) {
-      /* Surface the failure rather than silently diverging from the hardware;
-         the next poll re-syncs the control to its real state. */
-      setMessage("Command failed: " + path);
-      console.error(error);
-    });
-  }
+        return fetch(path, init)
+          .then(function (response) {
+            if (!response.ok) throw new Error(path + " -> " + response.status);
+            return response.json();
+          })
+          .finally(function () {
+            clearTimeout(timer);
+          });
+      },
 
-  function poll() {
-    request("/api/status")
-      .then(function (data) {
-        state.connected = true;
-        applyStatus(data);
-        render();
-      })
-      .catch(function () {
-        state.connected = false;
-        setMessage("No response from backend");
-        render();
-      });
-  }
+      post: function (path, body) {
+        var self = this;
 
-  /* Copy only the fields the backend actually sent, so a partial response
-     never blanks a control. */
-  function applyStatus(data) {
-    if (!data || typeof data !== "object") return;
+        return this.request(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        }).catch(function (error) {
+          /* Surface it rather than silently diverging from the hardware; the
+             next poll re-syncs the control to its real state. */
+          self.message = "Command failed: " + path;
+          console.error(error);
+        });
+      },
 
-    if (typeof data.lanes === "number") state.lanes = data.lanes;
-    if (typeof data.lane === "number") state.lane = data.lane;
-    if (typeof data.mic === "boolean") state.mic = data.mic;
-    if (typeof data.mute === "boolean") state.mute = data.mute;
-    if (typeof data.volume === "number") state.volume = clamp(data.volume, 0, 100);
-    if (typeof data.brightness === "number") state.brightness = clamp(data.brightness, 0, 100);
-    if (typeof data.level === "number") state.level = clamp(data.level, 0, 100);
-    if (typeof data.message === "string") state.message = data.message;
-  }
+      poll: function () {
+        var self = this;
 
-  function setMessage(text) {
-    state.message = text;
-  }
+        this.request("/api/status")
+          .then(function (data) {
+            self.connected = true;
+            self.applyStatus(data);
+          })
+          .catch(function () {
+            self.connected = false;
+            self.message = "No response from backend";
+          });
+      },
 
-  /* ---------- Actions ---------- */
+      /* Take only the fields the backend actually sent, so a partial response
+         never blanks a control. */
+      applyStatus: function (data) {
+        if (!data || typeof data !== "object") return;
 
-  function selectLane(lane) {
-    state.lane = lane;
-    setMessage("Lane " + lane + " selected");
-    render();
-    post("/api/lane", { lane: lane });
-  }
+        if (Array.isArray(data.lanes) && data.lanes.length) {
+          this.lanes = data.lanes.map(function (lane, index) {
+            var base = this.blankLane(typeof lane.id === "number" ? lane.id : index + 1);
 
-  function toggleMic() {
-    state.mic = !state.mic;
-    setMessage("Mic " + (state.mic ? "live" : "off"));
-    render();
-    post("/api/mic", { on: state.mic });
-  }
+            if (typeof lane.mic === "boolean") base.mic = lane.mic;
+            if (typeof lane.mute === "boolean") base.mute = lane.mute;
+            if (typeof lane.volume === "number") base.volume = clamp(lane.volume, 0, 100);
+            if (typeof lane.level === "number") base.level = clamp(lane.level, 0, 100);
 
-  function toggleMute() {
-    state.mute = !state.mute;
-    setMessage(state.mute ? "Speakers muted" : "Speakers on");
-    render();
-    post("/api/mute", { on: state.mute });
-  }
+            return base;
+          }, this);
+        }
 
-  function nudgeVolume(delta) {
-    state.volume = clamp(state.volume + delta, 0, 100);
-    render();
-    post("/api/volume", { value: state.volume });
-  }
+        if (typeof data.lane === "number") this.activeLaneId = data.lane;
+        if (typeof data.brightness === "number") this.brightness = clamp(data.brightness, 0, 100);
+        if (typeof data.message === "string") this.message = data.message;
 
-  function nudgeBrightness(delta) {
-    state.brightness = clamp(state.brightness + delta, 0, 100);
-    render();
-    post("/api/brightness", { value: state.brightness });
-  }
+        this.ensureActiveLaneExists();
+      },
 
-  function setSettingsOpen(open) {
-    state.settingsOpen = open;
-    render();
-  }
+      /* The lane count is operator-editable, so the active lane can vanish from
+         under the controls. Fall back to the highest remaining lane. */
+      ensureActiveLaneExists: function () {
+        var exists = this.lanes.some(function (lane) {
+          return lane.id === this.activeLaneId;
+        }, this);
 
-  /* ---------- Static DOM ---------- */
+        if (!exists && this.lanes.length) {
+          this.activeLaneId = this.lanes[this.lanes.length - 1].id;
+        }
+      },
 
-  /* Lane buttons and meter segments are built once. Re-rendering them every
-     frame would churn the DOM on a board with no headroom for it. */
-  function buildLanes() {
-    el["lane-grid"].textContent = "";
+      /* ---------- Actions ---------- */
 
-    for (var i = 1; i <= state.lanes; i++) {
-      var button = document.createElement("button");
-      button.className = "btn lane-btn";
-      button.dataset.lane = String(i);
-      button.textContent = String(i);
-      button.setAttribute("aria-label", "Lane " + i);
-      el["lane-grid"].appendChild(button);
+      selectLane: function (id) {
+        this.activeLaneId = id;
+        this.message = "Lane " + id + " selected";
+        this.post("/api/lane", { lane: id });
+      },
 
-      bindTap(button, (function (lane) {
-        return function () { selectLane(lane); };
-      })(i));
-    }
-  }
+      toggleMic: function () {
+        var lane = this.active;
+        lane.mic = !lane.mic;
+        this.message = "Lane " + lane.id + " mic " + (lane.mic ? "live" : "off");
+        this.post("/api/mic", { lane: lane.id, on: lane.mic });
+      },
 
-  function buildMeter() {
-    el["level-meter"].textContent = "";
+      toggleMute: function () {
+        var lane = this.active;
+        lane.mute = !lane.mute;
+        this.message = "Lane " + lane.id + " speakers " + (lane.mute ? "muted" : "on");
+        this.post("/api/mute", { lane: lane.id, on: lane.mute });
+      },
 
-    for (var i = 0; i < METER_SEGMENTS; i++) {
-      var segment = document.createElement("span");
-      segment.className = "meter-seg";
+      nudgeVolume: function (delta) {
+        var lane = this.active;
+        lane.volume = clamp(lane.volume + delta, 0, 100);
+        this.post("/api/volume", { lane: lane.id, value: lane.volume });
+      },
 
-      /* Top ~15% reads as peak, the band below it as warning. */
-      var position = i / METER_SEGMENTS;
-      if (position >= 0.85) segment.classList.add("peak");
-      else if (position >= 0.7) segment.classList.add("warn");
+      nudgeBrightness: function (delta) {
+        this.brightness = clamp(this.brightness + delta, 0, 100);
+        this.post("/api/brightness", { value: this.brightness });
+      },
 
-      el["level-meter"].appendChild(segment);
-    }
-  }
+      /* Changing the site's lane count. The backend owns the real list — it has
+         to add or drop hardware state — so this posts the count and lets the
+         next poll deliver the authoritative lanes. */
+      setLaneCount: function (count) {
+        count = clamp(count, this.minLanes, this.maxLanes);
+        if (count === this.lanes.length) return;
 
-  /* ---------- Render ---------- */
+        if (count < this.lanes.length) {
+          this.lanes = this.lanes.slice(0, count);
+        } else {
+          while (this.lanes.length < count) {
+            this.lanes.push(this.blankLane(this.lanes.length + 1));
+          }
+        }
 
-  function render() {
-    renderStatus();
-    renderLanes();
-    renderLatch(el["btn-mic"], state.mic);
-    renderLatch(el["btn-mute"], state.mute);
-    renderVolume();
-    renderMeter();
-    renderSettings();
+        this.ensureActiveLaneExists();
+        this.message = count + (count === 1 ? " lane" : " lanes") + " configured";
+        this.post("/api/lanes", { count: count });
+      }
+    };
+  });
+});
 
-    el["footer-msg"].textContent = state.message;
-  }
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
-  function renderStatus() {
-    var pill = el["status-pill"];
-    pill.classList.toggle("status-online", state.connected);
-    pill.classList.toggle("status-offline", !state.connected);
-    el["status-text"].textContent = state.connected ? "READY" : "NO LINK";
-  }
+/* Held-down feedback, delegated once for every button on the page.
+ *
+ * Not :active, which sticks on some touch panels when a press is cancelled
+ * mid-gesture. Kept out of Alpine because it's presentation only — routing it
+ * through component state would re-render the tree on every press.
+ *
+ * Note this is only the visual press. Taps themselves bind to pointerup in the
+ * markup (click is unreliable under WPE) with Alpine's .throttle modifier as
+ * the duplicate-event guard, so one tap acts exactly once. */
+document.addEventListener("pointerdown", function (event) {
+  var button = event.target.closest("button");
+  if (button && !button.disabled) button.classList.add("is-pressed");
+});
 
-  function renderLanes() {
-    var buttons = el["lane-grid"].children;
-    for (var i = 0; i < buttons.length; i++) {
-      var button = buttons[i];
-      button.classList.toggle("is-active", Number(button.dataset.lane) === state.lane);
-    }
-  }
-
-  function renderLatch(button, on) {
-    button.setAttribute("aria-pressed", on ? "true" : "false");
-    var label = button.querySelector(".latch-state");
-    label.textContent = on ? label.dataset.on : label.dataset.off;
-  }
-
-  function renderVolume() {
-    el["volume-value"].textContent = String(state.volume);
-    el["btn-vol-down"].disabled = state.volume <= 0;
-    el["btn-vol-up"].disabled = state.volume >= 100;
-  }
-
-  function renderMeter() {
-    /* A muted amplifier shows no level regardless of what the input is doing —
-       the meter reports what reaches the speakers, not what reaches the ADC. */
-    var level = state.mute ? 0 : state.level;
-    var lit = Math.round((level / 100) * METER_SEGMENTS);
-    var segments = el["level-meter"].children;
-
-    for (var i = 0; i < segments.length; i++) {
-      segments[i].classList.toggle("lit", i < lit);
-    }
-  }
-
-  function renderSettings() {
-    el["settings-overlay"].classList.toggle("hidden", !state.settingsOpen);
-    el["brightness-value"].textContent = String(state.brightness);
-    el["btn-bright-down"].disabled = state.brightness <= 10;
-    el["btn-bright-up"].disabled = state.brightness >= 100;
-    el["settings-backend"].textContent = state.connected ? window.location.host : "unreachable";
-  }
-
-  /* ---------- Start ---------- */
-
-  function init() {
-    cacheElements();
-    buildLanes();
-    buildMeter();
-
-    bindTap(el["btn-mic"], toggleMic);
-    bindTap(el["btn-mute"], toggleMute);
-    bindTap(el["btn-vol-down"], function () { nudgeVolume(-VOLUME_STEP); });
-    bindTap(el["btn-vol-up"], function () { nudgeVolume(VOLUME_STEP); });
-
-    bindTap(el["btn-settings"], function () { setSettingsOpen(true); });
-    bindTap(el["btn-settings-close"], function () { setSettingsOpen(false); });
-    bindTap(el["btn-reload"], function () { window.location.reload(); });
-    bindTap(el["btn-bright-down"], function () { nudgeBrightness(-BRIGHTNESS_STEP); });
-    bindTap(el["btn-bright-up"], function () { nudgeBrightness(BRIGHTNESS_STEP); });
-
-    el["footer-version"].textContent = "v" + UI_VERSION;
-    el["settings-version"].textContent = UI_VERSION;
-
-    render();
-    poll();
-    setInterval(poll, POLL_MS);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-})();
+["pointerup", "pointercancel", "pointerleave"].forEach(function (name) {
+  document.addEventListener(name, function (event) {
+    var button = event.target.closest("button");
+    if (button) button.classList.remove("is-pressed");
+  });
+});

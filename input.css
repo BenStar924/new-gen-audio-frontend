@@ -1,0 +1,104 @@
+/* Tailwind source for the Operator Console.
+ *
+ * Built once into www/vendor/app.css — see build-css.sh. The device never
+ * compiles CSS: the Play CDN is a runtime in-browser compiler and is both
+ * unreachable offline and wasteful on this board.
+ *
+ * Tailwind v4, which uses this CSS-first config rather than the v3 @tailwind
+ * directives and tailwind.config.js. Pin the major version: a v3 toolchain will
+ * not read this file.
+ */
+
+@import "tailwindcss";
+
+/* Scan the markup for classes to keep. vendor/ is excluded — Alpine's minified
+   bundle otherwise gets scanned and yields junk utilities. */
+@source "./www/**/*.{html,js}";
+@source not "./www/vendor";
+
+@theme {
+  --color-bg:          #0e1116;
+  --color-surface:     #171c24;
+  --color-surface-hi:  #212936;
+  --color-line:        #2c3542;
+
+  --color-txt:         #e6edf5;
+  --color-dim:         #94a3b3;
+
+  --color-accent:      #2f81f7;
+  --color-accent-press:#1f6feb;
+  --color-on:          #2ea043;
+  --color-warn:        #d29922;
+  --color-danger:      #da3633;
+
+  /* Touch targets are min-h-16 / min-w-16 (64px) throughout — the minimum
+     comfortable finger target on a 7" panel. */
+
+  /* System stack only — no web font is reachable on the offline device. */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Alpine paints x-data state on init; without this the raw pre-Alpine markup
+   flashes on screen first. */
+[x-cloak] {
+  display: none !important;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    /* Kiosk: the shell itself never scrolls. */
+    overflow: hidden;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-txt);
+    font-family: var(--font-sans);
+
+    /* Touch hygiene: no selection, no double-tap zoom, no tap highlight. */
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button {
+    /* No transitions anywhere: the VideoCore GPU only does OpenGL ES 2.0 and
+       has no frames to spare, and press feedback wants to be immediate rather
+       than eased. */
+    transition: none !important;
+  }
+}
+
+@layer components {
+  /* Lane sizing correction.
+   *
+   * The lane count is site-configurable (1-8), so the grid can't be a fixed
+   * template. Flex basis is computed from --lane-cols, which app.js sets to the
+   * column count that squares up best for the current lane count. Because the
+   * items can also grow, a final row holding fewer than --lane-cols lanes
+   * stretches to fill the width instead of leaving a ragged gap — which is what
+   * makes odd counts (3, 5, 7) look deliberate rather than broken. */
+  .lane-grid {
+    --lane-gap: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lane-gap);
+    align-content: stretch;
+  }
+
+  .lane-btn {
+    flex: 1 1 calc((100% - (var(--lane-cols) - 1) * var(--lane-gap)) / var(--lane-cols));
+    min-width: 0;
+  }
+
+  /* Held-down feedback. Driven by a delegated pointer listener in app.js rather
+     than :active, which sticks on some touch panels when a press is cancelled
+     mid-gesture. */
+  .is-pressed {
+    background-color: var(--color-accent-press) !important;
+    border-color: var(--color-accent) !important;
+  }
+}
