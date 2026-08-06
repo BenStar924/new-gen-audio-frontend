@@ -80,13 +80,19 @@ cp package/dist/cdn.min.js www/vendor/alpine.min.js
 
 ## Lanes
 
-A console has **1–8 lanes**. Each lane owns its audio state, and the controls
-act on whichever lane is selected — so the audio card is headed `LANE n · AUDIO`
-and the operator never has to guess what they're about to change.
+A console has **1–8 lanes**. **Mic and speaker state are per-lane; volume is
+not.** There is a single master volume for the whole console.
 
-Because the controls follow the active lane, each lane button carries two status
-dots — mic (green when live) and speakers (amber when un-muted). That's the only
-way to see that another lane is live without switching to it.
+The mic and speaker controls act on whichever lane is selected, so that card is
+headed `LANE n · MIC & SPEAKERS` and the operator never has to guess what
+they're about to change. The volume readout is captioned `MASTER VOL` for the
+same reason — it sits in the same cluster, so it has to say plainly that it is
+not the selected lane's volume.
+
+Because the per-lane controls follow the active lane, each lane button carries
+two status dots — mic (green when live) and speakers (amber when un-muted).
+That's the only way to see that another lane is live without switching to it.
+Lane tiles deliberately show no volume figure: there isn't a per-lane one.
 
 **Sizing correction.** The lane count is site-configurable *and* the lane area
 changes shape with the control position, so the grid can't be a fixed template.
@@ -149,6 +155,7 @@ for anything omitted, so a partial response never blanks a control.
 | --- | --- | --- |
 | `lanes` | array | One object per lane (below) |
 | `lane` | int | Active lane id |
+| `volume` | int | 0–100 — **master volume, console-wide** |
 | `layout` | string | Control position: `left`, `right` or `bottom` |
 | `brightness` | int | 0–100 |
 | `message` | string | Status line text |
@@ -160,8 +167,9 @@ Each entry in `lanes`:
 | `id` | int | Lane id, 1-based |
 | `mic` | bool | Microphone enabled (GPIO24) |
 | `mute` | bool | Amplifier muted (GPIO25, active high) |
-| `volume` | int | 0–100 |
 | `level` | int | 0–100, current level for the meter |
+
+There is no per-lane `volume`. A lane object carrying one is ignored.
 
 Commands, all `POST` with a JSON body, all returning `{"ok": true}`:
 
@@ -170,14 +178,15 @@ Commands, all `POST` with a JSON body, all returning `{"ok": true}`:
 | `/api/lane` | `{"lane": 3}` | Select active lane |
 | `/api/mic` | `{"lane": 3, "on": true}` | Per lane |
 | `/api/mute` | `{"lane": 3, "on": false}` | Per lane |
-| `/api/volume` | `{"lane": 3, "value": 65}` | Per lane |
+| `/api/volume` | `{"value": 65}` | Console — master volume, no lane id |
 | `/api/brightness` | `{"value": 80}` | Console |
 | `/api/lanes` | `{"count": 6}` | Console — set lane count |
 | `/api/layout` | `{"position": "bottom"}` | Console — control position |
 
 Per-lane commands name their lane explicitly rather than implying "whatever is
 selected", so a command can't land on the wrong lane if a selection races with a
-poll.
+poll. `/api/volume` carries no lane id at all, which is what makes it
+structurally impossible to apply master volume to one lane by mistake.
 
 Controls are optimistic: a tap updates the UI immediately, then POSTs. The next
 poll reconciles against the hardware's real state, so a rejected or failed
@@ -253,6 +262,10 @@ eased.
   or to move out of the console UI entirely.
 - **What else belongs on the main screen?** There's room beside the audio card,
   and at a single lane most of the screen is free.
+- **Are mic and speakers really per-lane?** The hardware guide describes a
+  single amplifier mute (GPIO25) and a single mic enable (GPIO24), which points
+  at those being console-wide too — the same correction that moved volume out of
+  the lane object. Left per-lane for now because only volume was corrected.
 - **Should control position be per-operator or per-site?** It is currently one
   device-wide setting, like lane count. If two people share a console on
   different shifts they will fight over it.

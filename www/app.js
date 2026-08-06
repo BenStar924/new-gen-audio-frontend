@@ -3,9 +3,10 @@
  * Loaded before vendor/alpine.min.js (both deferred, so document order is
  * execution order) and registers the component on alpine:init.
  *
- * State model: the console owns one or more lanes, and the audio controls act
- * on whichever lane is active. Every lane therefore carries its own mic, mute,
- * volume and level — there is no console-wide audio state.
+ * State model: the console owns one or more lanes. Mic and speaker state are
+ * per-lane and the controls act on whichever lane is active. Volume is NOT
+ * per-lane — there is a single master volume for the console, so it lives in
+ * console state and is posted without a lane id.
  *
  * The backend is the authority. Controls are optimistic: a tap updates local
  * state, renders, then POSTs. GET /api/status once a second reconciles, so a
@@ -16,7 +17,7 @@
 document.addEventListener("alpine:init", function () {
   Alpine.data("operatorConsole", function () {
     return {
-      uiVersion: "0.3.0",
+      uiVersion: "0.4.0",
 
       pollMs: 1000,
       requestTimeoutMs: 2000,
@@ -41,6 +42,9 @@ document.addEventListener("alpine:init", function () {
       controlsPosition: "right",
       controlsPositions: ["left", "right", "bottom"],
 
+      /* Master volume. One per console, not one per lane. */
+      volume: 60,
+
       activeLaneId: 1,
       brightness: 80,
       message: "Starting…",
@@ -59,7 +63,7 @@ document.addEventListener("alpine:init", function () {
       },
 
       blankLane: function (id) {
-        return { id: id, mic: false, mute: true, volume: 60, level: 0 };
+        return { id: id, mic: false, mute: true, level: 0 };
       },
 
       /* The lane the controls act on. Never undefined: a status response that
@@ -183,7 +187,6 @@ document.addEventListener("alpine:init", function () {
 
             if (typeof lane.mic === "boolean") base.mic = lane.mic;
             if (typeof lane.mute === "boolean") base.mute = lane.mute;
-            if (typeof lane.volume === "number") base.volume = clamp(lane.volume, 0, 100);
             if (typeof lane.level === "number") base.level = clamp(lane.level, 0, 100);
 
             return base;
@@ -191,6 +194,7 @@ document.addEventListener("alpine:init", function () {
         }
 
         if (typeof data.lane === "number") this.activeLaneId = data.lane;
+        if (typeof data.volume === "number") this.volume = clamp(data.volume, 0, 100);
         if (this.controlsPositions.indexOf(data.layout) !== -1) {
           this.controlsPosition = data.layout;
         }
@@ -242,10 +246,10 @@ document.addEventListener("alpine:init", function () {
         this.post("/api/mute", { lane: lane.id, on: lane.mute });
       },
 
+      /* Master volume — console-wide, so no lane id goes with it. */
       nudgeVolume: function (delta) {
-        var lane = this.active;
-        lane.volume = clamp(lane.volume + delta, 0, 100);
-        this.post("/api/volume", { lane: lane.id, value: lane.volume });
+        this.volume = clamp(this.volume + delta, 0, 100);
+        this.post("/api/volume", { value: this.volume });
       },
 
       nudgeBrightness: function (delta) {

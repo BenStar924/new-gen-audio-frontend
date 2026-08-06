@@ -32,6 +32,8 @@ state = {
     "lanes": [],
     "lane": 1,
     "layout": "right",
+    # Master volume: one per console, not one per lane.
+    "volume": 60,
     "brightness": 80,
     "message": "Mock backend — no hardware attached",
 }
@@ -44,7 +46,7 @@ def clamp(value, low, high):
 def new_lane(lane_id):
     # Muted matches the config.txt boot state (gpio=25=op,dh — GPIO25 is an
     # active-high mute), which is what the real backend reports at startup.
-    return {"id": lane_id, "mic": False, "mute": True, "volume": 60, "level": 0}
+    return {"id": lane_id, "mic": False, "mute": True, "level": 0}
 
 
 def set_lane_count(count):
@@ -131,6 +133,10 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             state["message"] = "Controls moved to %s" % position
             return self.send_json({"ok": True})
 
+        if path == "/api/volume":
+            state["volume"] = clamp(int(body.get("value", state["volume"])), 0, 100)
+            return self.send_json({"ok": True})
+
         if path == "/api/brightness":
             state["brightness"] = clamp(int(body.get("value", state["brightness"])), 0, 100)
             return self.send_json({"ok": True})
@@ -138,7 +144,7 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
         # Per-lane commands. These act on the lane named in the body, not on
         # whatever happens to be selected — the UI is not the source of truth
         # for which lane a command targets.
-        if path in ("/api/mic", "/api/mute", "/api/volume"):
+        if path in ("/api/mic", "/api/mute"):
             lane = find_lane(int(body.get("lane", state["lane"])))
             if lane is None:
                 return self.send_json({"error": "no such lane"}, status=400)
@@ -148,13 +154,10 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
                 state["message"] = "Lane %d mic %s" % (
                     lane["id"], "live" if lane["mic"] else "off")
 
-            elif path == "/api/mute":
+            else:
                 lane["mute"] = bool(body.get("on"))
                 state["message"] = "Lane %d speakers %s" % (
                     lane["id"], "muted" if lane["mute"] else "on")
-
-            else:
-                lane["volume"] = clamp(int(body.get("value", lane["volume"])), 0, 100)
 
             return self.send_json({"ok": True})
 
