@@ -17,19 +17,29 @@
 @source not "./www/vendor";
 
 @theme {
-  --color-bg:          #0e1116;
-  --color-surface:     #171c24;
-  --color-surface-hi:  #212936;
-  --color-line:        #2c3542;
+  /* Hamilton brand. Navy sampled from the wordmark. */
+  --color-navy:       #2B2A5E;
+  --color-navy-d:     #1B1A3E;
+  --color-navy-tint:  #B9B7E8;
 
-  --color-txt:         #e6edf5;
-  --color-dim:         #94a3b3;
+  --color-bg:         #EDEFF5;
+  --color-surface:    #FFFFFF;
+  --color-alt:        #F5F6FA;
+  --color-line:       #C9CDE0;
+  --color-line-d:     #E2E5EF;
 
-  --color-accent:      #2f81f7;
-  --color-accent-press:#1f6feb;
-  --color-on:          #2ea043;
-  --color-warn:        #d29922;
-  --color-danger:      #da3633;
+  --color-txt:        #16162E;
+  --color-dim:        #6B6E8C;
+  --color-mute:       #94A0BB;
+
+  /* Status colours are deliberately NOT brand colours. Mic-live and speaker
+     state have to be distinguishable from navy and from each other at a
+     glance — a navy "live" indicator would vanish into the chrome. */
+  --color-on:         #1F8A4C;
+  --color-on-d:       #145F35;
+  --color-warn:       #C77A10;
+  --color-warn-d:     #8A540B;
+  --color-danger:     #B3261E;
 
   /* Touch targets are min-h-16 / min-w-16 (64px) throughout — the minimum
      comfortable finger target on a 7" panel. */
@@ -75,14 +85,15 @@
 @layer components {
   /* Lane sizing correction.
    *
-   * The lane count is site-configurable (1-8), so the grid can't be a fixed
-   * template. Flex basis is computed from --lane-cols, which app.js sets to the
-   * column count that squares up best for the current lane count. Because the
+   * The lane count is site-configurable (1-8) and the lane area changes shape
+   * with the control position, so the grid can't be a fixed template. Flex
+   * basis is computed from --lane-cols, which app.js sets to the column count
+   * that squares up best for the current count *and* position. Because the
    * items can also grow, a final row holding fewer than --lane-cols lanes
    * stretches to fill the width instead of leaving a ragged gap — which is what
    * makes odd counts (3, 5, 7) look deliberate rather than broken. */
   .lane-grid {
-    --lane-gap: 0.75rem;
+    --lane-gap: 0.6rem;
     display: flex;
     flex-wrap: wrap;
     gap: var(--lane-gap);
@@ -98,7 +109,13 @@
      than :active, which sticks on some touch panels when a press is cancelled
      mid-gesture. */
   .is-pressed {
-    background-color: var(--color-accent-press) !important;
-    border-color: var(--color-accent) !important;
+    filter: brightness(0.92);
+  }
+
+  /* Physical-feeling press: the raised button drops onto the page. Paired with
+     the offset shadow on .raised. */
+  .raised.is-pressed {
+    transform: translateY(2px);
+    box-shadow: none !important;
   }
 }

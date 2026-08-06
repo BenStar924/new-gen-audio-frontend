@@ -1,6 +1,8 @@
 # Operator Console — front end
 
-Touchscreen UI for the Raspberry Pi Zero 2 W Operator Console. Static files in
+Touchscreen UI for the Raspberry Pi Zero 2 W Operator Console, in Hamilton
+livery — navy masthead over a white working field, the way the brand is applied
+on the building and in print. Static files in
 `www/`, served by the C backend (libmicrohttpd) and rendered by Cog / WPE WebKit
 in fullscreen kiosk mode.
 
@@ -26,8 +28,9 @@ operatorconsole/
 ## Running it
 
 ```sh
-python3 dev-server.py                  # http://127.0.0.1:8000, 4 lanes
-python3 dev-server.py 8000 --lanes 7   # try an odd lane count
+python3 dev-server.py                        # http://127.0.0.1:8000, 4 lanes
+python3 dev-server.py 8000 --lanes 7         # try an odd lane count
+python3 dev-server.py --layout bottom        # start with the control rail
 ```
 
 `dev-server.py` serves `www/` and implements the API below against in-memory
@@ -54,7 +57,7 @@ Tailwind emits only the classes it can find in `www/`, so **a class added to the
 markup does not exist until you rebuild**:
 
 ```sh
-./build-css.sh          # writes www/vendor/app.css (~11 KB minified)
+./build-css.sh          # writes www/vendor/app.css (~16 KB minified)
 ```
 
 The script prefers a standalone `./tailwindcss` binary (no Node.js needed on the
@@ -85,20 +88,49 @@ Because the controls follow the active lane, each lane button carries two status
 dots — mic (green when live) and speakers (amber when un-muted). That's the only
 way to see that another lane is live without switching to it.
 
-**Sizing correction.** The lane count is site-configurable, so the grid can't be
-a fixed template. `app.js` picks the column count that squares up best, and the
-flex rule in `input.css` lets a short final row stretch to fill the width, so odd
-counts read as deliberate rather than ragged:
+**Sizing correction.** The lane count is site-configurable *and* the lane area
+changes shape with the control position, so the grid can't be a fixed template.
+`app.js` picks the column count that squares up best for both, and the flex rule
+in `input.css` lets a short final row stretch to fill the width, so odd counts
+read as deliberate rather than ragged:
 
-| Lanes | Layout | Lanes | Layout |
-| --- | --- | --- | --- |
-| 1 | selector hidden entirely | 5 | 3 + 2 (stretched) |
-| 2 | 2 | 6 | 3 + 3 |
-| 3 | 3 | 7 | 4 + 3 (stretched) |
-| 4 | 2 + 2 | 8 | 4 + 4 |
+| Lanes | Controls at a side | Controls at the bottom |
+| --- | --- | --- |
+| 1 | selector hidden | selector hidden |
+| 2 | 2 | 2 |
+| 3 | 2 + 1 | 3 |
+| 4 | 2 + 2 | 2 + 2 |
+| 5 | 2 + 2 + 1 | 3 + 2 |
+| 6 | 3 + 3 | 3 + 3 |
+| 7 | 3 + 3 + 1 | 4 + 3 |
+| 8 | 3 + 3 + 2 | 4 + 4 |
 
-At one lane the selector is hidden — a one-option selector is noise — and the
-audio card is capped and centred rather than stretched edge to edge.
+Two mappings because the shape differs: with controls at the bottom the lane
+area is wide and short, so lanes spread out; at a side it is narrower and
+taller, so fewer columns keeps tiles from going skinny. At one lane the selector
+is hidden — a one-option selector is noise — and the audio card is capped and
+centred rather than stretched edge to edge.
+
+Every lane tile carries a small meter and two status dots, so a live lane is
+visible without selecting it. When the bottom rail squeezes the grid into more
+than one row the `LANE n` sublabel is dropped: the numeral already identifies
+the lane, and the label is the first thing worth losing to keep tiles whole.
+
+## Control position
+
+The mic / speakers / volume cluster can sit on the **left**, the **right** or
+the **bottom**, chosen by the operator in Settings and persisted by the backend.
+The panel does not always sit square in front of whoever is using it — mounted
+to one side of a machine, reach is not symmetric.
+
+It is one layout, not three: only the flex direction of `<main>` changes, and
+the lane grid and control cluster are the same markup in every position. In the
+bottom position the cluster becomes a true rail — its heading and meter turn
+vertical rather than eating the height the lane grid needs.
+
+Verified at 800×480 in all three positions across every lane count 1–8: no
+ragged rows, no clipped tiles, no overflow, and every control at or above the
+64px touch minimum (smallest lane tile 141×78).
 
 Lane count is set by the operator in Settings and persisted by the backend. The
 UI clamps 1–8 and posts the new count; the backend owns the real list, since it
@@ -117,6 +149,7 @@ for anything omitted, so a partial response never blanks a control.
 | --- | --- | --- |
 | `lanes` | array | One object per lane (below) |
 | `lane` | int | Active lane id |
+| `layout` | string | Control position: `left`, `right` or `bottom` |
 | `brightness` | int | 0–100 |
 | `message` | string | Status line text |
 
@@ -140,6 +173,7 @@ Commands, all `POST` with a JSON body, all returning `{"ok": true}`:
 | `/api/volume` | `{"lane": 3, "value": 65}` | Per lane |
 | `/api/brightness` | `{"value": 80}` | Console |
 | `/api/lanes` | `{"count": 6}` | Console — set lane count |
+| `/api/layout` | `{"position": "bottom"}` | Console — control position |
 
 Per-lane commands name their lane explicitly rather than implying "whatever is
 selected", so a command can't land on the wrong lane if a selection races with a
@@ -164,6 +198,23 @@ a `/favicon.ico` that isn't there). Verify before shipping:
 ```sh
 curl -s http://127.0.0.1:8000 | grep -iE "cdn|https?://"    # expect no output
 ```
+
+**Branding is inline SVG, not an image file.** The header carries mark A from
+`mockups/logo-h-marks.html` — the solid navy tile — chosen because it is one of
+only two marks that survives at 24px, and the header can fall back that far. To
+swap in mark H (the squared steel plate), replace the `<svg>` in the header and
+the favicon data URI with:
+
+```html
+<rect x="2" y="2" width="44" height="44" rx="4" fill="#1B1A3E"/>
+<rect x="6" y="6" width="36" height="36" rx="2" fill="none" stroke="#4A48A0" stroke-width="1.6"/>
+<path d="M14.5 13h6v8.6h7V13h6v22h-6v-8.7h-7V35h-6z" fill="#fff"/>
+```
+
+Navy is `#2B2A5E`, sampled from the wordmark. **Status colours are deliberately
+not brand colours:** mic-live green and speaker amber have to be
+distinguishable from navy and from each other at a glance, because they carry
+state that matters — a navy "live" indicator would disappear into the chrome.
 
 **Taps are bound to `pointerup`, not `click`,** which does not fire reliably
 under WPE. Alpine's `.throttle` modifier is the duplicate-event guard, so a panel
@@ -202,6 +253,9 @@ eased.
   or to move out of the console UI entirely.
 - **What else belongs on the main screen?** There's room beside the audio card,
   and at a single lane most of the screen is free.
+- **Should control position be per-operator or per-site?** It is currently one
+  device-wide setting, like lane count. If two people share a console on
+  different shifts they will fight over it.
 - **Faults.** Failures currently land in the status line. A hardware fault
   probably deserves something louder.
 - **Brightness** is in the API but has no backend behind it yet — it needs a
@@ -218,6 +272,6 @@ start time, `free -h` headroom at idle, and that every control responds to a
 single tap by finger, not just by mouse.
 
 The guide notes Tailwind and Alpine were never load-tested on this hardware.
-They're small vendored (~11 KB CSS, ~44 KB JS raw), but startup time and touch
+They're small vendored (~16 KB CSS, ~44 KB JS raw), but startup time and touch
 responsiveness with them in place should be measured on the target before
 committing to them.

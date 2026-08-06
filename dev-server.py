@@ -6,7 +6,7 @@ Stands in for the libmicrohttpd C app: serves www/ and implements the same
 developed and demoed on a laptop, or on the bench card before the C backend
 exists.
 
-    python3 dev-server.py [port] [--lanes N]     # default 8000, 4 lanes
+    python3 dev-server.py [port] [--lanes N] [--layout left|right|bottom]
 
 Then open http://127.0.0.1:8000 — or point the kiosk at it:
 
@@ -26,10 +26,12 @@ WWW_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 
 MIN_LANES = 1
 MAX_LANES = 8
+LAYOUTS = ("left", "right", "bottom")
 
 state = {
     "lanes": [],
     "lane": 1,
+    "layout": "right",
     "brightness": 80,
     "message": "Mock backend — no hardware attached",
 }
@@ -121,6 +123,14 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             state["message"] = "%d lane%s configured" % (count, "" if count == 1 else "s")
             return self.send_json({"ok": True, "count": count})
 
+        if path == "/api/layout":
+            position = body.get("position")
+            if position not in LAYOUTS:
+                return self.send_json({"error": "bad position"}, status=400)
+            state["layout"] = position
+            state["message"] = "Controls moved to %s" % position
+            return self.send_json({"ok": True})
+
         if path == "/api/brightness":
             state["brightness"] = clamp(int(body.get("value", state["brightness"])), 0, 100)
             return self.send_json({"ok": True})
@@ -178,6 +188,14 @@ def main():
     port = 8000
     lanes = 4
 
+    if "--layout" in args:
+        index = args.index("--layout")
+        layout = args[index + 1]
+        if layout not in LAYOUTS:
+            raise SystemExit("--layout must be one of %s" % ", ".join(LAYOUTS))
+        state["layout"] = layout
+        del args[index:index + 2]
+
     if "--lanes" in args:
         index = args.index("--lanes")
         lanes = int(args[index + 1])
@@ -190,7 +208,8 @@ def main():
 
     server = HTTPServer(("127.0.0.1", port), ConsoleHandler)
     print("Operator Console mock backend on http://127.0.0.1:%d" % port)
-    print("Serving %s with %d lane(s)" % (WWW_ROOT, len(state["lanes"])))
+    print("Serving %s with %d lane(s), controls %s"
+          % (WWW_ROOT, len(state["lanes"]), state["layout"]))
 
     try:
         server.serve_forever()

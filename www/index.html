@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Operator Console</title>
+  <title>Hamilton Operator Console</title>
   <!-- Inline favicon: the device is offline, and without this every load spends
        a request on a /favicon.ico that isn't there. -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='9' fill='%232f81f7'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' rx='11' fill='%232B2A5E'/><path d='M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z' fill='%23fff'/></svg>">
   <link rel="stylesheet" href="/vendor/app.css">
   <!-- app.js registers the Alpine component and must run before Alpine boots.
        Both are deferred, so document order is execution order. -->
@@ -16,42 +16,53 @@
 
 <body x-data="operatorConsole" x-cloak class="flex flex-col h-full">
 
-  <header class="flex items-center justify-between gap-3 px-3 py-2 bg-surface border-b border-line">
-    <div class="flex items-center gap-2.5">
-      <svg class="w-5.5 h-5.5 fill-accent" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7v8L12 19.7 5.3 16V8L12 4.3Z"/>
-        <circle cx="12" cy="12" r="3"/>
+  <!-- Navy masthead over a white working field — how the brand is applied on
+       the building and in print. -->
+  <header class="flex items-center justify-between gap-3 px-4 py-2 bg-navy shrink-0">
+    <div class="flex items-center gap-3">
+      <!-- Mark A, the solid tile. It is the only mark that stays legible at the
+           24px the header can fall back to; see mockups/logo-h-marks.html. -->
+      <svg class="w-9 h-9 shrink-0" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
+        <path d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z" fill="#2B2A5E"/>
       </svg>
-      <h1 class="text-lg font-semibold tracking-wide">Operator Console</h1>
+      <div class="leading-none">
+        <h1 class="text-lg font-extrabold tracking-[0.1em] text-white">HAMILTON</h1>
+        <p class="mt-1 text-[8px] font-bold tracking-[0.22em] text-navy-tint">OPERATOR CONSOLE</p>
+      </div>
     </div>
 
     <div class="flex items-center gap-2.5">
-      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-line bg-surface-hi text-xs font-semibold tracking-widest"
-           :class="connected ? 'text-on' : 'text-danger'">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/12 text-[11px] font-extrabold tracking-[0.12em]"
+           :class="connected ? 'text-[#8FEBB4]' : 'text-[#FFB4AE]'">
         <span class="w-2.5 h-2.5 rounded-full"
-              :class="connected ? 'bg-on' : 'bg-danger'" aria-hidden="true"></span>
+              :class="connected ? 'bg-[#4ADE80]' : 'bg-danger'" aria-hidden="true"></span>
         <span x-text="connected ? 'READY' : 'NO LINK'">CONNECTING</span>
       </div>
 
       <button type="button" aria-label="Settings"
               x-on:pointerup.prevent.throttle.250ms="settingsOpen = true"
-              class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-lg border border-line bg-surface-hi cursor-pointer">
-        <svg class="w-5.5 h-5.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl bg-white/12 text-white text-xl cursor-pointer">
+        <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.7l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.7L4.5 11a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2.1 1.6a.5.5 0 0 0-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6c0 .3.2.5.5.5h4c.3 0 .5-.2.5-.5l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.7L19.4 13ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
         </svg>
       </button>
     </div>
   </header>
 
-  <main class="flex-1 min-h-0 grid gap-3 p-3"
-        :class="lanes.length > 1 ? 'grid-cols-[1fr_20rem]' : 'grid-cols-1'">
+  <!-- Control cluster position is operator-configurable: right, left or bottom.
+       Only the flex direction changes — the lane grid and the cluster are the
+       same markup in all three, so there is one layout to maintain, not three. -->
+  <main class="flex-1 min-h-0 flex gap-2.5 p-2.5"
+        :class="controlsPosition === 'bottom' ? 'flex-col'
+                : controlsPosition === 'left' ? 'flex-row-reverse' : 'flex-row'">
 
     <!-- Lane selector. Hidden at a single lane: a one-option selector is noise,
-         and the audio card takes the full width instead. -->
+         and the audio card takes the space instead. -->
     <section x-show="lanes.length > 1"
-             class="flex flex-col min-h-0 gap-3 p-3 bg-surface border border-line rounded-lg"
+             class="flex flex-col min-h-0 min-w-0 flex-1 gap-2 p-2.5 bg-surface border-2 border-line rounded-xl"
              aria-labelledby="lanes-heading">
-      <h2 id="lanes-heading" class="text-xs font-bold tracking-[0.12em] uppercase text-dim">Lane</h2>
+      <h2 id="lanes-heading" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim">Lane</h2>
 
       <div class="lane-grid flex-1 min-h-0" :style="`--lane-cols: ${laneColumns}`">
         <template x-for="lane in lanes" :key="lane.id">
@@ -59,109 +70,166 @@
                   :aria-label="`Lane ${lane.id}`"
                   :aria-pressed="lane.id === activeLaneId"
                   x-on:pointerup.prevent.throttle.250ms="selectLane(lane.id)"
-                  class="lane-btn flex flex-col items-center justify-center gap-1 min-h-16 rounded-lg border cursor-pointer"
+                  class="lane-btn raised flex flex-col justify-between min-h-16 px-2.5 py-2 rounded-lg border-2 cursor-pointer"
                   :class="lane.id === activeLaneId
-                            ? 'bg-accent border-accent text-white'
-                            : 'bg-surface-hi border-line text-txt'">
-            <span class="text-3xl font-bold leading-none" x-text="lane.id"></span>
+                            ? 'bg-navy border-navy-d text-white shadow-[0_4px_0_var(--color-navy-d)]'
+                            : 'bg-alt border-line text-txt'">
+            <span class="flex items-start justify-between gap-2">
+              <span class="text-xs font-extrabold tabular-nums"
+                    :class="lane.id === activeLaneId ? 'text-navy-tint' : 'text-mute'"
+                    x-text="lane.volume"></span>
 
-            <!-- Per-lane status at a glance. With the controls following the
-                 active lane, this is the only way to see that another lane is
-                 live without switching to it. -->
-            <span class="flex items-center gap-1.5 h-2.5" aria-hidden="true">
-              <span class="w-2 h-2 rounded-full"
-                    :class="lane.mic ? 'bg-on' : (lane.id === activeLaneId ? 'bg-white/30' : 'bg-line')"></span>
-              <span class="w-2 h-2 rounded-full"
-                    :class="lane.mute ? (lane.id === activeLaneId ? 'bg-white/30' : 'bg-line') : 'bg-warn'"></span>
+              <!-- Per-lane status at a glance. With the controls following the
+                   active lane, this is the only way to see that another lane is
+                   live without switching to it. -->
+              <span class="flex items-center gap-1.5" aria-hidden="true">
+                <span class="w-2.5 h-2.5 rounded-full"
+                      :class="lane.mic ? (lane.id === activeLaneId ? 'bg-[#6EE7A5]' : 'bg-on')
+                                       : (lane.id === activeLaneId ? 'bg-white/30' : 'bg-line')"></span>
+                <span class="w-2.5 h-2.5 rounded-full"
+                      :class="!lane.mute ? (lane.id === activeLaneId ? 'bg-[#F0B860]' : 'bg-warn')
+                                         : (lane.id === activeLaneId ? 'bg-white/30' : 'bg-line')"></span>
+              </span>
+            </span>
+
+            <span class="flex flex-col items-center leading-none">
+              <span class="text-3xl font-extrabold" x-text="lane.id"></span>
+              <!-- Dropped when the bottom rail squeezes the grid into more than
+                   one row: the numeral already identifies the lane, and the
+                   label is the first thing worth losing to keep tiles whole. -->
+              <span x-show="!(controlsPosition === 'bottom' && lanes.length > laneColumns)"
+                    class="mt-1 text-[9px] font-extrabold tracking-[0.14em]"
+                    :class="lane.id === activeLaneId ? 'text-navy-tint' : 'text-dim'"
+                    x-text="`LANE ${lane.id}`"></span>
+            </span>
+
+            <!-- Per-lane meter, so a live lane is visible without selecting it. -->
+            <span class="flex gap-[2px] h-1.5" aria-hidden="true">
+              <template x-for="seg in tileSegments" :key="seg">
+                <span class="flex-1 rounded-[1px]" :class="tileSegmentClass(lane, seg)"></span>
+              </template>
             </span>
           </button>
         </template>
       </div>
     </section>
 
-    <!-- Audio controls. These act on the active lane only, so the heading
-         names it — the operator must never have to guess what they're about
-         to change. -->
-    <!-- At a single lane this card has the whole screen; cap and centre it so
-         the controls stay a sensible size instead of stretching edge to edge. -->
-    <section class="flex flex-col min-h-0 gap-3 p-3 bg-surface border border-line rounded-lg"
-             :class="lanes.length > 1 ? '' : 'w-full max-w-2xl mx-auto'"
+    <!-- Audio controls. These act on the active lane only, so the heading names
+         it — the operator must never have to guess what they're about to
+         change. -->
+    <section class="flex min-h-0 gap-2.5 p-2.5 bg-surface border-2 border-line rounded-xl shrink-0"
+             :class="controlsPosition === 'bottom' ? 'w-full flex-row items-stretch'
+                     : lanes.length > 1 ? 'w-76 flex-col' : 'w-full max-w-2xl mx-auto flex-1 flex-col'"
              aria-labelledby="controls-heading">
-      <h2 id="controls-heading" class="text-xs font-bold tracking-[0.12em] uppercase text-dim">
+      <h2 id="controls-heading" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim shrink-0"
+          :class="controlsPosition === 'bottom' ? '[writing-mode:vertical-rl] rotate-180 text-center' : ''">
         <span x-text="lanes.length > 1 ? `Lane ${activeLaneId} · Audio` : 'Audio'">Audio</span>
       </h2>
 
-      <div class="grid grid-cols-2 gap-3">
-        <button type="button" aria-label="Microphone" :aria-pressed="active.mic"
-                x-on:pointerup.prevent.throttle.250ms="toggleMic()"
-                class="flex flex-col items-center justify-center gap-1 min-h-[6.75rem] px-2 py-2.5 rounded-lg border cursor-pointer"
-                :class="active.mic ? 'bg-on border-on text-[#06210d]' : 'bg-surface-hi border-line text-txt'">
-          <svg class="w-8 h-8 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/>
-            <path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2Z"/>
-          </svg>
-          <span class="text-[13px]" :class="active.mic ? 'text-[#06210d]' : 'text-dim'">Mic</span>
-          <span class="text-[13px] font-bold tracking-wider" x-text="active.mic ? 'LIVE' : 'OFF'">OFF</span>
-        </button>
+      <!-- One markup for all three positions: only the flex direction of this
+           wrapper changes. -->
+      <div class="flex gap-2.5" :class="controlsPosition === 'bottom' ? 'flex-row items-stretch flex-1' : 'flex-col'">
 
-        <button type="button" aria-label="Speakers" :aria-pressed="active.mute"
-                x-on:pointerup.prevent.throttle.250ms="toggleMute()"
-                class="flex flex-col items-center justify-center gap-1 min-h-[6.75rem] px-2 py-2.5 rounded-lg border cursor-pointer"
-                :class="active.mute ? 'bg-warn border-warn text-[#241a00]' : 'bg-surface-hi border-line text-txt'">
-          <!-- The glyph tracks the state so it can never contradict the label. -->
-          <svg x-show="active.mute" class="w-8 h-8 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 9v6h4l5 5V4L8 9H4Z"/>
-            <path d="m21.2 12 2.1-2.1-1.4-1.4-2.1 2.1-2.1-2.1-1.4 1.4 2.1 2.1-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4-2.1-2.1Z"/>
-          </svg>
-          <svg x-show="!active.mute" class="w-8 h-8 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 9v6h4l5 5V4L8 9H4Z"/>
-            <path d="M16 7.5a5 5 0 0 1 0 9v-2a3 3 0 0 0 0-5v-2Z"/>
-            <path d="M16 3a9 9 0 0 1 0 18v-2a7 7 0 0 0 0-14V3Z"/>
-          </svg>
-          <span class="text-[13px]" :class="active.mute ? 'text-[#241a00]' : 'text-dim'">Speakers</span>
-          <span class="text-[13px] font-bold tracking-wider" x-text="active.mute ? 'MUTED' : 'ON'">MUTED</span>
-        </button>
-      </div>
+        <div class="flex gap-2.5" :class="controlsPosition === 'bottom' ? 'flex-1' : ''">
+          <button type="button" aria-label="Microphone" :aria-pressed="active.mic"
+                  x-on:pointerup.prevent.throttle.250ms="toggleMic()"
+                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer"
+                  :class="(controlsPosition === 'bottom' ? 'min-h-16 ' : 'min-h-24 ') + (active.mic ? 'bg-on border-on-d text-white shadow-[0_4px_0_var(--color-on-d)]'
+                                     : 'bg-alt border-line text-txt')">
+            <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/>
+              <path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2Z"/>
+            </svg>
+            <span class="text-xs" :class="active.mic ? 'text-white/85' : 'text-dim'">Mic</span>
+            <span class="text-[15px] font-extrabold tracking-wide" x-text="active.mic ? 'LIVE' : 'OFF'">OFF</span>
+          </button>
 
-      <div class="flex flex-col gap-3">
-        <div class="flex items-center justify-between gap-3">
+          <button type="button" aria-label="Speakers" :aria-pressed="active.mute"
+                  x-on:pointerup.prevent.throttle.250ms="toggleMute()"
+                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-xl border-2 cursor-pointer"
+                  :class="(controlsPosition === 'bottom' ? 'min-h-16 ' : 'min-h-24 ') + (!active.mute ? 'bg-warn border-warn-d text-white shadow-[0_4px_0_var(--color-warn-d)]'
+                                       : 'bg-alt border-line text-txt')">
+            <!-- The glyph tracks the state so it can never contradict the label. -->
+            <svg x-show="active.mute" class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9v6h4l5 5V4L8 9H4Z"/>
+              <path d="m21.2 12 2.1-2.1-1.4-1.4-2.1 2.1-2.1-2.1-1.4 1.4 2.1 2.1-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4-2.1-2.1Z"/>
+            </svg>
+            <svg x-show="!active.mute" class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9v6h4l5 5V4L8 9H4Z"/>
+              <path d="M16 7.5a5 5 0 0 1 0 9v-2a3 3 0 0 0 0-5v-2Z"/>
+              <path d="M16 3a9 9 0 0 1 0 18v-2a7 7 0 0 0 0-14V3Z"/>
+            </svg>
+            <span class="text-xs" :class="!active.mute ? 'text-white/85' : 'text-dim'">Speakers</span>
+            <span class="text-[15px] font-extrabold tracking-wide" x-text="active.mute ? 'MUTED' : 'ON'">MUTED</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2.5 shrink-0"
+             :class="controlsPosition === 'bottom' ? '' : 'justify-between'">
           <button type="button" aria-label="Volume down" :disabled="active.volume <= 0"
                   x-on:pointerup.prevent.throttle.150ms="nudgeVolume(-volumeStep)"
-                  class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-lg border border-line bg-surface-hi text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
 
-          <div class="flex flex-col items-center leading-none">
-            <span class="text-4xl font-bold tabular-nums" x-text="active.volume">60</span>
-            <span class="mt-1 text-[11px] font-bold tracking-[0.14em] text-dim">VOL</span>
+          <div class="flex flex-col items-center leading-none" :class="controlsPosition === 'bottom' ? 'w-24' : ''">
+            <span class="text-4xl font-extrabold tabular-nums text-navy" x-text="active.volume">60</span>
+            <span class="mt-1 text-[10px] font-extrabold tracking-[0.14em] text-dim">VOL</span>
           </div>
 
           <button type="button" aria-label="Volume up" :disabled="active.volume >= 100"
                   x-on:pointerup.prevent.throttle.150ms="nudgeVolume(volumeStep)"
-                  class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-lg border border-line bg-surface-hi text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">+</button>
         </div>
+      </div>
 
-        <div class="flex gap-[3px] h-4.5" role="img" aria-label="Audio level meter">
-          <template x-for="seg in meterSegments" :key="seg">
-            <span class="flex-1 rounded-sm" :class="meterSegmentClass(seg)"></span>
-          </template>
-        </div>
+      <div class="flex gap-[3px] shrink-0" role="img" aria-label="Audio level meter"
+           :class="controlsPosition === 'bottom' ? 'flex-col-reverse w-4' : 'h-4'">
+        <template x-for="seg in meterSegments" :key="seg">
+          <span class="flex-1 rounded-sm" :class="meterSegmentClass(seg)"></span>
+        </template>
       </div>
     </section>
 
   </main>
 
-  <footer class="flex items-center justify-between gap-3 px-3 py-1.5 bg-surface border-t border-line text-xs text-dim">
+  <footer class="flex items-center justify-between gap-3 px-4 py-1.5 bg-navy text-[11px] text-navy-tint shrink-0">
     <span x-text="message">Starting&hellip;</span>
     <span class="tabular-nums" x-text="`v${uiVersion}`"></span>
   </footer>
 
   <div x-show="settingsOpen"
-       class="fixed inset-0 flex items-center justify-center p-3 bg-black/65">
-    <div class="w-[min(30rem,100%)] max-h-full overflow-y-auto flex flex-col gap-3 p-4 bg-surface border border-line rounded-lg"
+       class="fixed inset-0 flex items-center justify-center p-3 bg-navy-d/70">
+    <div class="w-[min(32rem,100%)] max-h-full overflow-y-auto flex flex-col gap-2.5 p-4 bg-surface border-2 border-line rounded-xl"
          role="dialog" aria-modal="true" aria-labelledby="settings-heading">
-      <h2 id="settings-heading" class="text-xs font-bold tracking-[0.12em] uppercase text-dim">Settings</h2>
+      <h2 id="settings-heading" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim">Settings</h2>
 
-      <!-- Lane count is per-site and operator-editable. -->
-      <div class="flex items-center justify-between gap-3 min-h-16 px-1 border-b border-line">
+      <!-- Control position. Mount the panel where you like and put the controls
+           on the side the operator actually reaches from. -->
+      <div class="flex flex-col gap-2 py-2 border-b-2 border-line">
+        <span class="text-[15px]">Controls on</span>
+        <div class="flex gap-2.5">
+          <template x-for="pos in ['left', 'right', 'bottom']" :key="pos">
+            <button type="button" :aria-label="`Controls ${pos}`" :aria-pressed="controlsPosition === pos"
+                    x-on:pointerup.prevent.throttle.250ms="setControlsPosition(pos)"
+                    class="raised flex-1 flex flex-col items-center justify-center gap-2 min-h-16 py-2 rounded-xl border-2 cursor-pointer"
+                    :class="controlsPosition === pos
+                              ? 'bg-navy border-navy-d text-white shadow-[0_3px_0_var(--color-navy-d)]'
+                              : 'bg-alt border-line text-dim'">
+              <!-- Miniature of the layout it selects. -->
+              <span class="flex gap-[3px] w-11 h-7 p-[3px] rounded-[3px] border"
+                    :class="controlsPosition === pos ? 'border-white/40' : 'border-line'"
+                    :style="pos === 'bottom' ? 'flex-direction:column' : (pos === 'left' ? 'flex-direction:row' : 'flex-direction:row-reverse')"
+                    aria-hidden="true">
+                <span class="rounded-[1px]" :class="controlsPosition === pos ? 'bg-white' : 'bg-mute'"
+                      :style="pos === 'bottom' ? 'height:34%' : 'width:34%'"></span>
+                <span class="flex-1 rounded-[1px]" :class="controlsPosition === pos ? 'bg-white/35' : 'bg-line'"></span>
+              </span>
+              <span class="text-[11px] font-extrabold tracking-[0.08em] uppercase" x-text="pos"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-3 min-h-16 py-1 border-b-2 border-line">
         <div class="flex flex-col">
           <span class="text-[15px]">Lanes at this site</span>
           <span class="text-xs text-dim" x-text="`${minLanes}–${maxLanes}`"></span>
@@ -169,44 +237,39 @@
         <div class="flex items-center gap-2.5">
           <button type="button" aria-label="Fewer lanes" :disabled="lanes.length <= minLanes"
                   x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length - 1)"
-                  class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-lg border border-line bg-surface-hi text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
-          <span class="min-w-[3ch] text-center text-xl font-bold tabular-nums" x-text="lanes.length"></span>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
+          <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="lanes.length"></span>
           <button type="button" aria-label="More lanes" :disabled="lanes.length >= maxLanes"
                   x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length + 1)"
-                  class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-lg border border-line bg-surface-hi text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">+</button>
         </div>
       </div>
 
-      <div class="flex items-center justify-between gap-3 min-h-16 px-1 border-b border-line">
+      <div class="flex items-center justify-between gap-3 min-h-16 py-1 border-b-2 border-line">
         <span class="text-[15px]">Display brightness</span>
         <div class="flex items-center gap-2.5">
           <button type="button" aria-label="Brightness down" :disabled="brightness <= 10"
                   x-on:pointerup.prevent.throttle.150ms="nudgeBrightness(-brightnessStep)"
-                  class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-lg border border-line bg-surface-hi text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
-          <span class="min-w-[3ch] text-center text-xl font-bold tabular-nums" x-text="brightness"></span>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
+          <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="brightness"></span>
           <button type="button" aria-label="Brightness up" :disabled="brightness >= 100"
                   x-on:pointerup.prevent.throttle.150ms="nudgeBrightness(brightnessStep)"
-                  class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-lg border border-line bg-surface-hi text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">+</button>
         </div>
       </div>
 
-      <div class="flex items-center justify-between gap-3 min-h-16 px-1 border-b border-line">
+      <div class="flex items-center justify-between gap-3 min-h-16 py-1 border-b-2 border-line">
         <span class="text-[15px]">Backend</span>
         <span class="text-sm text-dim tabular-nums" x-text="connected ? backendHost : 'unreachable'">&mdash;</span>
       </div>
 
-      <div class="flex items-center justify-between gap-3 min-h-16 px-1 border-b border-line">
-        <span class="text-[15px]">UI version</span>
-        <span class="text-sm text-dim tabular-nums" x-text="uiVersion">&mdash;</span>
-      </div>
-
-      <div class="flex gap-3">
+      <div class="flex gap-2.5">
         <button type="button"
                 x-on:pointerup.prevent.throttle.250ms="window.location.reload()"
-                class="flex-1 flex items-center justify-center min-h-16 rounded-lg border border-line bg-surface-hi font-semibold cursor-pointer">Reload UI</button>
+                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-navy cursor-pointer shadow-[0_3px_0_var(--color-line)]">Reload UI</button>
         <button type="button"
                 x-on:pointerup.prevent.throttle.250ms="settingsOpen = false"
-                class="flex-1 flex items-center justify-center min-h-16 rounded-lg border border-accent bg-accent font-semibold cursor-pointer">Close</button>
+                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-navy-d bg-navy text-white font-bold cursor-pointer shadow-[0_3px_0_var(--color-navy-d)]">Close</button>
       </div>
     </div>
   </div>

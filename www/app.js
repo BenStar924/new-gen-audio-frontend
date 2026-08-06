@@ -16,11 +16,12 @@
 document.addEventListener("alpine:init", function () {
   Alpine.data("operatorConsole", function () {
     return {
-      uiVersion: "0.2.0",
+      uiVersion: "0.3.0",
 
       pollMs: 1000,
       requestTimeoutMs: 2000,
       meterSegments: 24,
+      tileSegments: 12,
       volumeStep: 5,
       brightnessStep: 10,
 
@@ -31,6 +32,15 @@ document.addEventListener("alpine:init", function () {
 
       connected: false,
       lanes: [],
+
+      /* Where the mic/speakers/volume cluster sits: "left", "right" or
+         "bottom". Operator-configurable, because the panel does not always sit
+         square in front of them — mounted to one side, reach is not symmetric.
+         Only the flex direction of <main> changes; the markup is identical in
+         all three. */
+      controlsPosition: "right",
+      controlsPositions: ["left", "right", "bottom"],
+
       activeLaneId: 1,
       brightness: 80,
       message: "Starting…",
@@ -63,17 +73,39 @@ document.addEventListener("alpine:init", function () {
         return found || this.lanes[0] || this.blankLane(this.activeLaneId);
       },
 
-      /* Column count that squares up best for the current lane count on a
-         landscape panel. Paired with the flex-grow rule in input.css, a final
-         row holding fewer lanes than this stretches to fill the width, so odd
-         counts read as deliberate instead of ragged.
-             1→1  2→2  3→3  4→2  5→3  6→3  7→4  8→4 */
+      /* Column count that squares up best for the current lane count. Paired
+         with the flex-grow rule in input.css, a final row holding fewer lanes
+         than this stretches to fill the width, so odd counts read as
+         deliberate instead of ragged.
+
+         Two mappings, because the control position changes the shape of the
+         lane area: with controls at the bottom it is wide and short, so lanes
+         can spread out; with controls at a side it is narrower and taller, so
+         fewer columns keeps the tiles from going skinny. */
       get laneColumns() {
-        var byCount = { 1: 1, 2: 2, 3: 3, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4 };
+        var wide = { 1: 1, 2: 2, 3: 3, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4 };
+        var narrow = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3 };
+
+        var byCount = this.controlsPosition === "bottom" ? wide : narrow;
         return byCount[this.lanes.length] || Math.ceil(Math.sqrt(this.lanes.length));
       },
 
       /* ---------- Meter ---------- */
+
+      /* Small meter inside each lane tile. Same rule as the big meter, applied
+         to any lane rather than the active one — that is what makes a live
+         lane visible without selecting it. */
+      tileSegmentClass: function (lane, index) {
+        var level = lane.mute ? 0 : lane.level;
+        var lit = Math.round((level / 100) * this.tileSegments);
+        var isActive = lane.id === this.activeLaneId;
+
+        if (index >= lit) return isActive ? "bg-navy-d" : "bg-line-d";
+        if (index / this.tileSegments >= 0.75) {
+          return isActive ? "bg-[#E4A034]" : "bg-warn";
+        }
+        return isActive ? "bg-[#3FBF77]" : "bg-on";
+      },
 
       meterSegmentClass: function (index) {
         /* A muted amplifier shows no level whatever the input is doing — the
@@ -81,7 +113,7 @@ document.addEventListener("alpine:init", function () {
         var level = this.active.mute ? 0 : this.active.level;
         var lit = Math.round((level / 100) * this.meterSegments);
 
-        if (index >= lit) return "bg-surface-hi";
+        if (index >= lit) return "bg-line-d";
 
         var position = index / this.meterSegments;
         if (position >= 0.85) return "bg-danger";
@@ -159,6 +191,9 @@ document.addEventListener("alpine:init", function () {
         }
 
         if (typeof data.lane === "number") this.activeLaneId = data.lane;
+        if (this.controlsPositions.indexOf(data.layout) !== -1) {
+          this.controlsPosition = data.layout;
+        }
         if (typeof data.brightness === "number") this.brightness = clamp(data.brightness, 0, 100);
         if (typeof data.message === "string") this.message = data.message;
 
@@ -183,6 +218,14 @@ document.addEventListener("alpine:init", function () {
         this.activeLaneId = id;
         this.message = "Lane " + id + " selected";
         this.post("/api/lane", { lane: id });
+      },
+
+      setControlsPosition: function (position) {
+        if (this.controlsPositions.indexOf(position) === -1) return;
+
+        this.controlsPosition = position;
+        this.message = "Controls moved to " + position;
+        this.post("/api/layout", { position: position });
       },
 
       toggleMic: function () {
