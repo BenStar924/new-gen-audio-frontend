@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>27 — Daylight tiles + meters + rail (16×17)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#dfe4ea;color:#0f172a;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+.grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:7px;padding:7px}
+.lane{border-radius:16px;background:#fff;border:2px solid #cbd5e1;padding:11px 13px;
+  display:flex;flex-direction:column;justify-content:space-between;position:relative}
+.lane.on{background:#1d4ed8;border-color:#1e3a8a;color:#fff;box-shadow:0 5px 0 #1e3a8a}
+.lt{display:flex;align-items:flex-start;justify-content:space-between}
+.lt .n b{font-size:44px;font-weight:800;line-height:.95;display:block}
+.lt .n span{font-size:10px;letter-spacing:.16em;color:#64748b;font-weight:800}
+.lane.on .lt .n span{color:#c7dbff}
+.tags{display:flex;gap:5px}
+.tag{font-size:9px;font-weight:800;letter-spacing:.1em;padding:5px 9px;border-radius:99px;
+  background:#e2e8f0;color:#64748b}
+.tag.mic{background:#16a34a;color:#fff}
+.tag.spk{background:#ea580c;color:#fff}
+.lane.on .tag{background:#1e3a8a;color:#c7dbff}
+.lane.on .tag.mic{background:#16a34a;color:#fff}
+.lane.on .tag.spk{background:#ea580c;color:#fff}
+.bt{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.tm{flex:1;height:9px;display:flex;gap:2px}
+.tm i{flex:1;border-radius:2px;background:#e2e8f0}
+.lane.on .tm i{background:#1e3a8a}
+.tm i.g{background:#16a34a}.tm i.a{background:#ea580c}
+.lane.on .tm i.g{background:#4ade80}.lane.on .tm i.a{background:#fb923c}
+.vv{font-size:18px;font-weight:800;color:#94a3b8;line-height:1}
+.lane.on .vv{color:#fff}
+.rail{height:96px;display:flex;align-items:center;gap:8px;padding:8px 11px;background:#fff;
+  border-top:2px solid #cbd5e1}
+.ctx{font-size:11px;font-weight:800;letter-spacing:.12em;color:#1d4ed8;writing-mode:vertical-rl;
+  transform:rotate(180deg);text-align:center}
+.b{flex:1;height:100%;border-radius:14px;border:2px solid #cbd5e1;background:#f8fafc;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:12px;color:#64748b}
+.b .s{font-size:17px;font-weight:800;letter-spacing:.05em;color:#0f172a}
+.b.live{background:#16a34a;border-color:#14532d;color:#dcfce7;box-shadow:0 4px 0 #14532d}
+.b.live .s{color:#fff}
+.b.amber{background:#ea580c;border-color:#7c2d12;color:#ffedd5;box-shadow:0 4px 0 #7c2d12}
+.b.amber .s{color:#fff}
+.step{width:78px;height:100%;border-radius:14px;border:2px solid #cbd5e1;background:#f8fafc;
+  font-size:31px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 #cbd5e1}
+.vol{width:108px;text-align:center}
+.vol b{font-size:37px;font-weight:800;line-height:1}
+.vol span{display:block;font-size:10px;letter-spacing:.14em;color:#64748b;font-weight:800}
+</style></head><body>
+<div class="grid">
+  <div class="lane">
+    <div class="lt"><div class="n"><b>1</b><span>LANE 1</span></div><div class="tags"><span class="tag">OFF</span></div></div>
+    <div class="bt"><div class="tm"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="vv">60</div></div>
+  </div>
+  <div class="lane on">
+    <div class="lt"><div class="n"><b>2</b><span>LANE 2</span></div>
+      <div class="tags"><span class="tag mic">MIC</span><span class="tag spk">SPKR</span></div></div>
+    <div class="bt"><div class="tm"><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="a"></i><i></i><i></i><i></i><i></i><i></i></div><div class="vv">65</div></div>
+  </div>
+  <div class="lane">
+    <div class="lt"><div class="n"><b>3</b><span>LANE 3</span></div><div class="tags"><span class="tag">OFF</span></div></div>
+    <div class="bt"><div class="tm"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="vv">45</div></div>
+  </div>
+  <div class="lane">
+    <div class="lt"><div class="n"><b>4</b><span>LANE 4</span></div><div class="tags"><span class="tag mic">MIC</span></div></div>
+    <div class="bt"><div class="tm"><i class="g"></i><i class="g"></i><i class="g"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="vv">72</div></div>
+  </div>
+</div>
+<div class="rail">
+  <div class="ctx">LANE 2</div>
+  <div class="b live">Mic<span class="s">LIVE</span></div>
+  <div class="b amber">Speakers<span class="s">ON</span></div>
+  <div class="step">−</div>
+  <div class="vol"><b>65</b><span>VOL</span></div>
+  <div class="step">+</div>
+  <div class="step">⚙</div>
+</div>
+</body></html>

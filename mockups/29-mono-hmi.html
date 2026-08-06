@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>29 — Mono HMI (no amber)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#000;color:#dcdcdc;
+  font-family:ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;
+  background:#0f0f0f;border-bottom:2px solid #3a3a3a;font-size:12px;letter-spacing:.2em}
+.led{width:11px;height:11px;border-radius:50%;background:#e8e8e8;display:inline-block;
+  vertical-align:-1px;margin-right:7px;box-shadow:0 0 8px rgba(255,255,255,.7)}
+.grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:5px;padding:5px}
+/* Selection is carried by inversion, not hue — nothing here relies on colour
+   vision, and it stays legible through a dirty or sun-bleached panel. */
+.lane{border:2px solid #3a3a3a;background:#0a0a0a;position:relative;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.lane.on{background:#e8e8e8;color:#000;border-color:#fff}
+.lane b{font-size:50px;font-weight:700;line-height:1}
+.tag{font-size:10px;letter-spacing:.2em;color:#7a7a7a}
+.lane.on .tag{color:#333}
+.num{position:absolute;top:8px;left:10px;font-size:10px;letter-spacing:.16em;color:#7a7a7a}
+.lane.on .num{color:#333}
+.leds{position:absolute;top:8px;right:10px;display:flex;gap:7px}
+.l{width:11px;height:11px;border-radius:50%;background:#1c1c1c;border:2px solid #3a3a3a}
+.l.on{background:#fff;box-shadow:0 0 7px rgba(255,255,255,.8)}
+.lane.on .l{background:#c7c7c7;border-color:#555}
+.lane.on .l.on{background:#000;box-shadow:none;border-color:#000}
+.mini{position:absolute;left:10px;right:10px;bottom:8px;height:8px;display:flex;gap:2px}
+.mini i{flex:1;background:#1c1c1c}
+.mini i.on{background:#fff}
+.lane.on .mini i{background:#c7c7c7}
+.lane.on .mini i.on{background:#000}
+.rail{height:90px;display:flex;gap:5px;padding:0 5px 5px}
+.ctx{width:48px;border:2px solid #3a3a3a;background:#0f0f0f;display:flex;align-items:center;
+  justify-content:center;font-size:11px;letter-spacing:.16em;writing-mode:vertical-rl;transform:rotate(180deg)}
+.sw{flex:1;border:2px solid #3a3a3a;background:#0a0a0a;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px}
+.sw .k{font-size:10px;letter-spacing:.18em;color:#7a7a7a}
+.sw .v{font-size:20px;font-weight:700;letter-spacing:.1em}
+.sw.on{background:#e8e8e8;color:#000;border-color:#fff}
+.sw.on .k{color:#333}
+.step{width:78px;border:2px solid #3a3a3a;background:#0a0a0a;font-size:31px;
+  display:flex;align-items:center;justify-content:center}
+.rd{width:120px;border:2px solid #3a3a3a;background:#0a0a0a;display:flex;flex-direction:column;
+  align-items:center;justify-content:center}
+.rd b{font-size:33px;line-height:1;font-weight:700}
+.rd span{font-size:9px;letter-spacing:.2em;color:#7a7a7a}
+</style></head><body>
+<header><span>OPERATOR CONSOLE</span><span><i class="led"></i>SYS READY · ⚙</span></header>
+<div class="grid">
+  <div class="lane"><span class="num">L01</span><div class="leds"><i class="l"></i><i class="l"></i></div>
+    <b>1</b><span class="tag">STANDBY</span>
+    <div class="mini"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+  <div class="lane on"><span class="num">L02</span><div class="leds"><i class="l on"></i><i class="l on"></i></div>
+    <b>2</b><span class="tag">ACTIVE</span>
+    <div class="mini"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div></div>
+  <div class="lane"><span class="num">L03</span><div class="leds"><i class="l"></i><i class="l"></i></div>
+    <b>3</b><span class="tag">STANDBY</span>
+    <div class="mini"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+  <div class="lane"><span class="num">L04</span><div class="leds"><i class="l on"></i><i class="l"></i></div>
+    <b>4</b><span class="tag">MIC OPEN</span>
+    <div class="mini"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+</div>
+<div class="rail">
+  <div class="ctx">LANE 02</div>
+  <div class="sw on"><span class="k">MIC</span><span class="v">LIVE</span></div>
+  <div class="sw on"><span class="k">SPKR</span><span class="v">ON</span></div>
+  <div class="step">−</div>
+  <div class="rd"><b>065</b><span>VOL</span></div>
+  <div class="step">+</div>
+</div>
+</body></html>

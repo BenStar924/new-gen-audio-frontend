@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>24 — Daylight two-panel + fader (17×19)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#eef1f5;color:#0f172a;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;
+  background:#fff;border-bottom:2px solid #cbd5e1}
+h1{font-size:17px;font-weight:700}
+.rt{display:flex;align-items:center;gap:10px}
+.pill{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:99px;
+  background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;letter-spacing:.12em}
+.dot{width:9px;height:9px;border-radius:50%;background:#16a34a}
+.gear{width:46px;height:46px;border-radius:12px;background:#f8fafc;border:2px solid #cbd5e1;
+  display:flex;align-items:center;justify-content:center;font-size:19px}
+main{flex:1;display:grid;grid-template-columns:1fr 272px;gap:11px;padding:11px;min-height:0}
+.card{background:#fff;border:2px solid #cbd5e1;border-radius:14px;padding:11px;
+  display:flex;flex-direction:column;gap:9px;min-height:0}
+.label{font-size:10px;font-weight:800;letter-spacing:.14em;color:#64748b;text-transform:uppercase}
+.lanes{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.lane{border-radius:12px;border:2px solid #cbd5e1;background:#f8fafc;padding:8px 10px;
+  display:flex;flex-direction:column;justify-content:space-between}
+.lane.on{background:#1d4ed8;border-color:#1e3a8a;color:#fff;box-shadow:0 4px 0 #1e3a8a}
+.lt{display:flex;align-items:center;justify-content:space-between}
+.lt b{font-size:27px;font-weight:800;line-height:1}
+.lt .v{font-size:13px;font-weight:800;color:#64748b}
+.lane.on .lt .v{color:#c7dbff}
+.pips{display:flex;gap:5px}
+.p{width:9px;height:9px;border-radius:50%;background:#cbd5e1}
+.lane.on .p{background:rgba(255,255,255,.35)}
+.p.g{background:#16a34a}.p.a{background:#ea580c}
+.lane.on .p.g{background:#86efac}.lane.on .p.a{background:#fdba74}
+.tm{height:7px;display:flex;gap:2px}
+.tm i{flex:1;border-radius:2px;background:#e2e8f0}
+.lane.on .tm i{background:#1e3a8a}
+.tm i.g{background:#16a34a}.tm i.a{background:#ea580c}
+.lane.on .tm i.g{background:#4ade80}.lane.on .tm i.a{background:#fb923c}
+.ctl{flex:1;display:flex;gap:10px;min-height:0}
+.fw{display:flex;gap:8px}
+.tr{width:60px;border-radius:12px;border:2px solid #cbd5e1;background:#eef2f7;position:relative}
+.fill{position:absolute;left:3px;right:3px;bottom:3px;height:65%;border-radius:9px;background:#1d4ed8}
+.knob{position:absolute;left:-5px;right:-5px;bottom:63%;height:15px;border-radius:5px;
+  background:#fff;border:2px solid #475569;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.mtr{width:24px;border-radius:12px;border:2px solid #cbd5e1;background:#eef2f7;position:relative;overflow:hidden}
+.mtr i{position:absolute;left:3px;right:3px;bottom:3px;height:62%;border-radius:9px;
+  background:linear-gradient(#dc2626,#ea580c 30%,#16a34a 62%)}
+.col{flex:1;display:flex;flex-direction:column;gap:9px}
+.rd{flex:1;border-radius:12px;background:#f8fafc;border:2px solid #cbd5e1;display:flex;
+  flex-direction:column;align-items:center;justify-content:center}
+.rd b{font-size:38px;font-weight:800;line-height:1}
+.rd span{font-size:10px;letter-spacing:.16em;color:#64748b;font-weight:800}
+.sw{border-radius:12px;height:54px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 12px;border:2px solid #cbd5e1;background:#f8fafc}
+.sw .k{font-size:11px;color:#64748b;font-weight:700}
+.sw .v{font-size:15px;font-weight:800;letter-spacing:.05em}
+.sw.on{background:#16a34a;border-color:#14532d;box-shadow:0 3px 0 #14532d;color:#fff}
+.sw.on .k{color:#dcfce7}
+.sw.amber{background:#ea580c;border-color:#7c2d12;box-shadow:0 3px 0 #7c2d12;color:#fff}
+.sw.amber .k{color:#ffedd5}
+footer{background:#fff;border-top:2px solid #cbd5e1;padding:6px 15px;display:flex;
+  justify-content:space-between;font-size:11px;color:#64748b}
+</style></head><body>
+<header><h1>Operator Console</h1>
+  <div class="rt"><div class="pill"><span class="dot"></span>READY</div><div class="gear">⚙</div></div></header>
+<main>
+  <div class="card">
+    <div class="label">Lane</div>
+    <div class="lanes">
+      <div class="lane"><div class="lt"><b>1</b><span class="v">60</span></div>
+        <div class="pips"><i class="p"></i><i class="p"></i></div>
+        <div class="tm"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="lane on"><div class="lt"><b>2</b><span class="v">65</span></div>
+        <div class="pips"><i class="p g"></i><i class="p a"></i></div>
+        <div class="tm"><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="a"></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="lane"><div class="lt"><b>3</b><span class="v">45</span></div>
+        <div class="pips"><i class="p"></i><i class="p"></i></div>
+        <div class="tm"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="lane"><div class="lt"><b>4</b><span class="v">72</span></div>
+        <div class="pips"><i class="p g"></i><i class="p"></i></div>
+        <div class="tm"><i class="g"></i><i class="g"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">Lane 2 · Audio</div>
+    <div class="ctl">
+      <div class="fw"><div class="tr"><div class="fill"></div><div class="knob"></div></div>
+        <div class="mtr"><i></i></div></div>
+      <div class="col">
+        <div class="rd"><b>65</b><span>VOL</span></div>
+        <div class="sw on"><span class="k">Mic</span><span class="v">LIVE</span></div>
+        <div class="sw amber"><span class="k">Speakers</span><span class="v">ON</span></div>
+      </div>
+    </div>
+  </div>
+</main>
+<footer><span>Lane 2 mic live · Lane 4 mic live</span><span>v0.2.0</span></footer>
+</body></html>

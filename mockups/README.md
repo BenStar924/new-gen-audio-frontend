@@ -58,6 +58,42 @@ the selected lane, so one tap arms a lane and the big stepper stays unambiguous.
 **20** is the answer to the scaling problem in 06: rows stack to 8 where channel
 strips do not fit across the panel, at the cost of shorter meters.
 
+## Round 3 — 21–30
+
+Built from the five kept in round 2 (11 HMI lane-first, 12 daylight HMI, 16
+daylight lane-first, 17 daylight refined, 19 tiles + fader). All five were
+**selected-lane** designs, so that control model is settled and no longer varied
+here — every mockup below uses it. What remains open is lane layout, control
+placement, and palette.
+
+| # | Lane layout | Control placement | Palette |
+| --- | --- | --- | --- |
+| 21 | Full-bleed tiles | Right column, fader | HMI |
+| 22 | Full-bleed tiles | Right column, fader | Daylight |
+| 23 | Two-panel | Right panel, fader | HMI |
+| 24 | Two-panel | Right panel, fader | Daylight |
+| 25 | Active lane expands | Inside the expanded lane | Dark modern |
+| 26 | Full-width panel | Bottom rail | HMI |
+| 27 | Full-bleed tiles + meters | Bottom rail | Daylight |
+| 28 | Two-panel | Right panel, stepper | Warm paper |
+| 29 | Full-bleed tiles | Bottom rail | Mono (no hue) |
+| 30 | Tiles right | **Left** column | Daylight |
+
+Three of these are arguments rather than permutations:
+
+- **25** makes the selected lane physically larger and moves its controls
+  inside it, so the thing you're touching is the thing you're changing. Its
+  weakness is visible in the render — at four lanes the expanded panel has
+  obvious dead space, and it would need either more per-lane content or a
+  tighter layout to earn the room.
+- **29** carries selection by inversion rather than hue. Nothing depends on
+  colour vision, and it survives a sun-bleached or dirty panel better than any
+  of the coloured schemes. Status still reads, but "mic live" is no longer
+  green — worth deciding whether that matters for a safety-relevant state.
+- **30** mirrors the controls to the left. Every other design here assumes
+  right-or-bottom, which is only correct if the panel sits square in front of
+  the operator. If it's mounted to one side, reach isn't symmetric.
+
 ## Note on 06 and 07
 
 Both show every lane's controls simultaneously, which is a **different
