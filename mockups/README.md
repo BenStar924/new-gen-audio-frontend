@@ -94,6 +94,36 @@ Three of these are arguments rather than permutations:
   right-or-bottom, which is only correct if the panel sits square in front of
   the operator. If it's mounted to one side, reach isn't symmetric.
 
+## Hamilton brand — 31–36 and the H marks
+
+Navy **#2B2A5E**, sampled from the wordmark. Status colours are deliberately
+*not* brand colours: green #1F8A4C for mic live and amber #C77A10 for speakers
+have to be distinguishable from navy at a glance, and from each other, because
+they carry safety-relevant state.
+
+`logo-h-marks.html` explores eight H monograms. Each is shown large, then at
+40px and 24px — the sizes it would actually appear at in the console header —
+then reversed on navy. **The small row is the test.** B (vault door) and E (dial)
+are the most interesting large and the first to fail small: the ring, bolts and
+dial all close up below ~32px. A (solid tile) and F (hexagon) survive; the
+mockups use A, with F on 34.
+
+| # | Layout | Palette |
+| --- | --- | --- |
+| 31 | Two-panel, stepper | Light, navy accents |
+| 32 | Full-bleed tiles + rail | Light, navy masthead |
+| 33 | Tiles + fader column | Dark navy |
+| 34 | Two-panel HMI, lamps | Dark navy, mono type |
+| 35 | Controls left | Light |
+| 36 | Two-panel, stepper | Navy masthead + footer, light body |
+
+36 is the closest to how the brand is actually applied on the building and in
+print — a navy band with a white working field — and needs the fewest invented
+decisions. 33 and 34 are the ones that required real invention: navy can't be
+both the background *and* the selected-lane colour, so selection moves to a
+lighter periwinkle (#5B57D6 / #6D69E0) derived from the brand rather than taken
+from it. That's a departure worth a second opinion from whoever owns the brand.
+
 ## Note on 06 and 07
 
 Both show every lane's controls simultaneously, which is a **different

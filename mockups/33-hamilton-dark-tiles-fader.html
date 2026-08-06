@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>33 — Hamilton dark, tiles + fader</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0F0E22;--surf:#191834;--surf-hi:#242247;--line:#35336B;--txt:#E9EAF5;
+  --dim:#9A98C0;--sel:#5B57D6;--sel-d:#3E3AA8;--green:#2EA35C;--amber:#D2911F}
+body{width:800px;height:480px;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex}
+.left{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;
+  background:var(--surf);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px}
+.wm b{font-size:15px;font-weight:800;letter-spacing:.1em;display:block;line-height:1}
+.wm span{font-size:7px;font-weight:700;letter-spacing:.2em;color:var(--dim);display:block;margin-top:2px}
+.sb{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--dim)}
+.sb i{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
+.grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;padding:8px}
+.lane{border-radius:13px;background:var(--surf);border:2px solid var(--line);position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.lane.on{background:#221F5C;border-color:var(--sel)}
+.n{font-size:48px;font-weight:800;line-height:.95}
+.lane.on .n{color:#A8A4FF}
+.nm{font-size:10px;letter-spacing:.14em;color:var(--dim);font-weight:800}
+.tags{position:absolute;top:9px;left:10px;display:flex;gap:5px}
+.tag{font-size:9px;font-weight:800;letter-spacing:.1em;padding:4px 8px;border-radius:99px;
+  background:var(--surf-hi);color:#6E6BA0}
+.tag.mic{background:var(--green);color:#04240F}
+.tag.spk{background:var(--amber);color:#2A1C00}
+.tm{position:absolute;left:10px;right:10px;bottom:9px;height:7px;display:flex;gap:2px}
+.tm i{flex:1;border-radius:2px;background:var(--surf-hi)}
+.tm i.g{background:var(--green)}.tm i.a{background:var(--amber)}
+.vv{position:absolute;bottom:22px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;color:#6E6BA0}
+.lane.on .vv{color:#A8A4FF}
+.right{width:198px;background:var(--surf);border-left:1px solid var(--line);display:flex;
+  flex-direction:column;gap:9px;padding:10px}
+.hd{font-size:10px;font-weight:800;letter-spacing:.12em;color:var(--dim);text-align:center}
+.hd em{font-style:normal;color:#A8A4FF;display:block;font-size:16px;margin-top:3px}
+.fw{flex:1;display:flex;gap:9px;justify-content:center;min-height:0}
+.tr{width:60px;border-radius:11px;border:1px solid var(--line);background:var(--bg);position:relative}
+.fill{position:absolute;left:3px;right:3px;bottom:3px;height:65%;border-radius:8px;background:var(--sel)}
+.knob{position:absolute;left:-5px;right:-5px;bottom:63%;height:15px;border-radius:5px;
+  background:#C7C5E8;border:2px solid var(--bg)}
+.mtr{width:26px;border-radius:11px;border:1px solid var(--line);background:var(--bg);position:relative;overflow:hidden}
+.mtr i{position:absolute;left:3px;right:3px;bottom:3px;height:62%;border-radius:8px;
+  background:linear-gradient(#DA3633,var(--amber) 32%,var(--green) 62%)}
+.rd{text-align:center}
+.rd b{font-size:32px;font-weight:800;line-height:1;display:block}
+.rd span{font-size:10px;letter-spacing:.16em;color:var(--dim);font-weight:800}
+.sw{border-radius:11px;border:1px solid var(--line);background:var(--surf-hi);height:50px;
+  display:flex;align-items:center;justify-content:space-between;padding:0 12px}
+.sw .k{font-size:11px;color:var(--dim)}
+.sw .v{font-size:15px;font-weight:800;letter-spacing:.05em}
+.sw.on{background:var(--green);border-color:var(--green);color:#04240F}.sw.on .k{color:#0B3D1C}
+.sw.amber{background:var(--amber);border-color:var(--amber);color:#2A1C00}.sw.amber .k{color:#4A3200}
+</style></head><body>
+<div class="left">
+  <div class="top">
+    <div class="brand">
+      <svg viewBox="0 0 48 48" width="30" height="30"><rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
+        <path d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z" fill="#2B2A5E"/></svg>
+      <div class="wm"><b>HAMILTON</b><span>OPERATOR CONSOLE</span></div>
+    </div>
+    <div class="sb"><i></i>READY · ⚙</div>
+  </div>
+  <div class="grid">
+    <div class="lane"><div class="tags"><span class="tag">OFF</span></div><div class="n">1</div>
+      <div class="nm">LANE 1</div><div class="vv">60</div>
+      <div class="tm"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="lane on"><div class="tags"><span class="tag mic">MIC</span><span class="tag spk">SPKR</span></div>
+      <div class="n">2</div><div class="nm">LANE 2</div><div class="vv">65</div>
+      <div class="tm"><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="a"></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="lane"><div class="tags"><span class="tag">OFF</span></div><div class="n">3</div>
+      <div class="nm">LANE 3</div><div class="vv">45</div>
+      <div class="tm"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="lane"><div class="tags"><span class="tag mic">MIC</span></div><div class="n">4</div>
+      <div class="nm">LANE 4</div><div class="vv">72</div>
+      <div class="tm"><i class="g"></i><i class="g"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+  </div>
+</div>
+<div class="right">
+  <div class="hd">CONTROLLING<em>Lane 2</em></div>
+  <div class="fw"><div class="tr"><div class="fill"></div><div class="knob"></div></div>
+    <div class="mtr"><i></i></div></div>
+  <div class="rd"><b>65</b><span>VOL</span></div>
+  <div class="sw on"><span class="k">Mic</span><span class="v">LIVE</span></div>
+  <div class="sw amber"><span class="k">Speakers</span><span class="v">ON</span></div>
+</div>
+</body></html>
