@@ -1,0 +1,70 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Fastest way to see the UI: no C toolchain, no build step. Runs on
+      // Windows, macOS or Linux — anywhere with Python 3.
+      "label": "Run mock backend (no build)",
+      "type": "shell",
+      "command": "python3",
+      "windows": { "command": "python" },
+      "args": ["dev-server.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "detail": "Serves www/ + the /api contract on http://127.0.0.1:8000"
+    },
+    {
+      "label": "Run mock backend — bottom rail, 7 lanes",
+      "type": "shell",
+      "command": "python3",
+      "windows": { "command": "python" },
+      "args": ["dev-server.py", "8000", "--lanes", "7", "--layout", "bottom"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      // Needs Linux — WSL2 on a Windows dev box, or the Pi itself.
+      "label": "CMake configure",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["-B", "build", "-DCMAKE_BUILD_TYPE=Debug"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "detail": "Fails with a clear message if libgpiod is v1 — the API is incompatible"
+    },
+    {
+      "label": "CMake build",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "build"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "build", "isDefault": true },
+      "dependsOn": "CMake configure",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Run operatorconsole (C)",
+      "type": "shell",
+      "command": "./build/operatorconsole",
+      "args": ["--port", "8000", "--www", "www", "--config", "./console.conf"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": "CMake build",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      // Tailwind emits only the classes it can find in www/, so a class added
+      // to the markup does not exist until this runs.
+      "label": "Build CSS",
+      "type": "shell",
+      "command": "./build-css.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  // The toolchain the environment guide specifies.
+  "recommendations": [
+    "ms-vscode.cpptools",              // IntelliSense, debugging for the C app
+    "ms-vscode.cmake-tools",           // build system integration
+    "ms-vscode-remote.remote-wsl",     // Linux toolchain from Windows
+    "ms-python.python",                // runs dev-server.py
+    "ritwickdey.liveserver"            // front-end preview — see the caveat in README
+  ]
+}

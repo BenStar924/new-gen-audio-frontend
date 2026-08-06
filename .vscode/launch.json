@@ -1,0 +1,53 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // F5 builds, then runs under gdb. Linux only (WSL2 or the Pi) — the C
+      // application does not build on Windows.
+      "name": "Debug operatorconsole",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/operatorconsole",
+      "args": ["--port", "8000", "--www", "www", "--config", "./console.conf"],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "preLaunchTask": "CMake build",
+      "setupCommands": [
+        {
+          "description": "Pretty-print structures",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          // libmicrohttpd runs handlers on its own threads. Without this,
+          // hitting a breakpoint in a handler stops every thread including the
+          // one serving the page, which looks like the server hanging.
+          "description": "Only stop the thread that hit the breakpoint",
+          "text": "set non-stop off",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      // Remote debugging on the board. Start gdbserver there first:
+      //     gdbserver :2345 ./operatorconsole --www www
+      "name": "Debug on the Pi (gdbserver)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-pi/operatorconsole",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb-multiarch",
+      "miDebuggerServerAddress": "console.local:2345",
+      "setupCommands": [
+        {
+          "description": "Pretty-print structures",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

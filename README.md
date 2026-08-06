@@ -74,6 +74,33 @@ Without a `/dev/gpiochip0` the program still runs, reports
 `"hardware": false` at `/api/status`, and tracks state without driving pins —
 so the UI can be worked on anywhere. It says so rather than pretending.
 
+## In VS Code
+
+Open the `operatorconsole` folder itself as the workspace (not the repo root) —
+the tasks and launch configs are scoped to it.
+
+`Ctrl+Shift+P` → **Tasks: Run Task**:
+
+| Task | Needs | What it does |
+| --- | --- | --- |
+| Run mock backend (no build) | Python 3 | Serves the UI on :8000. Works on Windows. |
+| CMake build | Linux / WSL2 | Builds the C application |
+| Run operatorconsole (C) | Linux / WSL2 | Builds, then runs the real program |
+| Build CSS | Tailwind CLI or npx | Rebuilds `www/vendor/app.css` |
+
+`F5` builds and debugs the C application under gdb. There is a second launch
+config for `gdb-multiarch` against `gdbserver` on the board.
+
+**The Live Server extension will not work on its own.** It serves static files,
+so the page loads but every `/api/status` poll 404s — the console shows
+**NO LINK** and no control does anything. The UI is deliberately backed by a
+real API; run the mock backend instead and open `http://127.0.0.1:8000`.
+
+**On Windows, the C application does not build** — libmicrohttpd and libgpiod
+are Linux libraries. Use the **Remote – WSL** extension (`Ctrl+Shift+P` →
+*WSL: Reopen Folder in WSL*) and build there. The Python mock runs natively on
+Windows either way.
+
 ## Running it
 
 ```sh
