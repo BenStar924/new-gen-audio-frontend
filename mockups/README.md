@@ -32,6 +32,32 @@ emoji placeholders standing in for the inline SVG the real UI uses.
 | 09 | Bottom tabs | Phone-app idiom — lanes as a bottom tab bar. |
 | 10 | Dial | Volume as a large arc gauge with the level as an outer ring. |
 
+## Round 2 — 11–20
+
+Crosses of the five kept from round 1 (01 baseline, 02 lane-first, 04 industrial
+HMI, 05 daylight, 06 mixer strips). The axes being separated here are **layout**
+(where lanes live), **palette** (dark / industrial / daylight) and **control
+model** (selected-lane only vs. every lane at once).
+
+| # | Direction | Cross | Control model |
+| --- | --- | --- | --- |
+| 11 | HMI lane-first | 04 × 02 | Selected lane |
+| 12 | Daylight HMI | 04 × 05 | Selected lane |
+| 13 | Light mixer strips | 06 × 05 | All lanes |
+| 14 | HMI mixer strips | 06 × 04 | All lanes |
+| 15 | Rich lane tiles | 01 × 06 | All lanes (toggles) + selected (volume) |
+| 16 | Daylight lane-first | 02 × 05 | Selected lane |
+| 17 | Daylight refined + tile meters | 01 × 05 × 06 | Selected lane |
+| 18 | HMI refined + tile meters | 01 × 04 × 06 | Selected lane |
+| 19 | Tiles + fader column | 02 × 06 | Selected lane, fader-style volume |
+| 20 | Lane rows | 06 rotated | All lanes |
+
+15 and 20 are the two worth arguing about. **15** is a hybrid control model —
+mic and speakers are per-tile and always reachable, but volume still belongs to
+the selected lane, so one tap arms a lane and the big stepper stays unambiguous.
+**20** is the answer to the scaling problem in 06: rows stack to 8 where channel
+strips do not fit across the panel, at the cost of shorter meters.
+
 ## Note on 06 and 07
 
 Both show every lane's controls simultaneously, which is a **different

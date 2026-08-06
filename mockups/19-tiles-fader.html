@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>19 — Tiles + fader column (02×06)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#0b0e13;color:#e6edf5;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex}
+.left{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;
+  background:#141920;border-bottom:1px solid #242e3a}
+.top h1{font-size:15px;font-weight:600}
+.sub{font-size:10px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+.grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;padding:8px}
+.lane{border-radius:14px;background:#141920;border:2px solid #232c39;position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.lane.on{background:#16243c;border-color:#2f81f7}
+.n{font-size:54px;font-weight:800;line-height:.9}
+.lane.on .n{color:#8ec0ff}
+.nm{font-size:11px;letter-spacing:.16em;color:#94a3b3;font-weight:800}
+.tags{position:absolute;top:9px;left:10px;display:flex;gap:5px}
+.tag{font-size:9px;font-weight:800;letter-spacing:.1em;padding:4px 8px;border-radius:99px;
+  background:#1d2634;color:#5d6b7a}
+.tag.mic{background:#2ea043;color:#06210d}
+.tag.spk{background:#d29922;color:#241a00}
+.lvl{position:absolute;right:10px;top:10px;bottom:10px;width:7px;border-radius:99px;
+  background:#0b0e13;overflow:hidden}
+.lvl i{position:absolute;bottom:0;left:0;right:0;border-radius:99px;background:linear-gradient(#d29922,#2ea043)}
+.vv{position:absolute;bottom:9px;left:0;right:0;text-align:center;font-size:12px;
+  font-weight:800;color:#5d6b7a}
+.lane.on .vv{color:#8ec0ff}
+.right{width:196px;background:#0f141b;border-left:1px solid #242e3a;display:flex;
+  flex-direction:column;gap:9px;padding:10px}
+.hd{font-size:10px;font-weight:800;letter-spacing:.12em;color:#94a3b3;text-align:center}
+.hd em{font-style:normal;color:#8ec0ff;display:block;font-size:15px;margin-top:3px}
+.fader{flex:1;display:flex;gap:8px;min-height:0}
+.tr{flex:1;border-radius:10px;background:#141920;border:1px solid #242e3a;position:relative}
+.fill{position:absolute;left:3px;right:3px;bottom:3px;height:65%;border-radius:8px;background:#2f81f7}
+.knob{position:absolute;left:-4px;right:-4px;bottom:63%;height:16px;border-radius:5px;
+  background:#94a3b3;border:2px solid #0b0e13}
+.mtr{width:22px;border-radius:10px;background:#141920;border:1px solid #242e3a;position:relative;overflow:hidden}
+.mtr i{position:absolute;left:3px;right:3px;bottom:3px;height:62%;border-radius:8px;
+  background:linear-gradient(#da3633,#d29922 32%,#2ea043 62%)}
+.vnum{text-align:center;font-size:30px;font-weight:800;line-height:1}
+.b{height:52px;border-radius:11px;border:1px solid #242e3a;background:#1b2330;
+  display:flex;align-items:center;justify-content:center;gap:7px;font-size:11px;
+  font-weight:800;letter-spacing:.08em;color:#94a3b3}
+.b.mic{background:#2ea043;border-color:#2ea043;color:#06210d}
+.b.spk{background:#d29922;border-color:#d29922;color:#241a00}
+</style></head><body>
+<div class="left">
+  <div class="top"><h1>Operator Console</h1><span class="sub">READY · ⚙</span></div>
+  <div class="grid">
+    <div class="lane"><div class="tags"><span class="tag">OFF</span></div><div class="n">1</div>
+      <div class="nm">LANE 1</div><div class="lvl"><i style="height:0"></i></div><div class="vv">60</div></div>
+    <div class="lane on"><div class="tags"><span class="tag mic">MIC</span><span class="tag spk">SPKR</span></div>
+      <div class="n">2</div><div class="nm">LANE 2</div><div class="lvl"><i style="height:62%"></i></div><div class="vv">65</div></div>
+    <div class="lane"><div class="tags"><span class="tag">OFF</span></div><div class="n">3</div>
+      <div class="nm">LANE 3</div><div class="lvl"><i style="height:0"></i></div><div class="vv">45</div></div>
+    <div class="lane"><div class="tags"><span class="tag mic">MIC</span></div><div class="n">4</div>
+      <div class="nm">LANE 4</div><div class="lvl"><i style="height:18%"></i></div><div class="vv">72</div></div>
+  </div>
+</div>
+<div class="right">
+  <div class="hd">CONTROLLING<em>LANE 2</em></div>
+  <div class="fader">
+    <div class="tr"><div class="fill"></div><div class="knob"></div></div>
+    <div class="mtr"><i></i></div>
+  </div>
+  <div class="vnum">65</div>
+  <div class="b mic">MIC LIVE</div>
+  <div class="b spk">SPKR ON</div>
+</div>
+</body></html>

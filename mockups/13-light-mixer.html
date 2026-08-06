@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>13 — Light mixer strips (06×05)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#eef1f5;color:#0f172a;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+  background:#fff;border-bottom:2px solid #cbd5e1}
+h1{font-size:17px;font-weight:700}
+.sub{font-size:11px;letter-spacing:.14em;color:#64748b;font-weight:800}
+main{flex:1;display:flex;gap:10px;padding:11px;min-height:0}
+.strip{flex:1;background:#fff;border:2px solid #cbd5e1;border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 8px}
+.strip.on{border-color:#1d4ed8;box-shadow:0 0 0 2px #bfdbfe}
+.hd{font-size:24px;font-weight:800;line-height:1}
+.strip.on .hd{color:#1d4ed8}
+.tg{font-size:9px;letter-spacing:.14em;font-weight:800;color:#64748b}
+.body{flex:1;display:flex;gap:8px;width:100%;min-height:0}
+.fader{width:36px;border-radius:10px;background:#e2e8f0;border:2px solid #cbd5e1;position:relative}
+.fill{position:absolute;left:3px;right:3px;bottom:3px;border-radius:7px;background:#1d4ed8}
+.knob{position:absolute;left:-4px;right:-4px;height:14px;border-radius:5px;background:#fff;
+  border:2px solid #475569;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.mtr{flex:1;border-radius:10px;background:#e2e8f0;border:2px solid #cbd5e1;position:relative;overflow:hidden}
+.mtr i{position:absolute;left:3px;right:3px;bottom:3px;border-radius:7px;
+  background:linear-gradient(#dc2626,#ea580c 30%,#16a34a 60%)}
+.val{font-size:18px;font-weight:800;line-height:1}
+.bs{width:100%;display:flex;flex-direction:column;gap:6px}
+.b{height:42px;border-radius:10px;border:2px solid #cbd5e1;background:#f8fafc;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
+  letter-spacing:.08em;color:#64748b}
+.b.mic{background:#16a34a;border-color:#14532d;color:#fff}
+.b.spk{background:#ea580c;border-color:#7c2d12;color:#fff}
+footer{background:#fff;border-top:2px solid #cbd5e1;padding:6px 16px;display:flex;
+  justify-content:space-between;font-size:11px;color:#64748b}
+</style></head><body>
+<header><h1>Operator Console</h1><span class="sub">ALL LANES · READY · ⚙</span></header>
+<main>
+  <div class="strip">
+    <div class="hd">1</div><div class="tg">LANE 1</div>
+    <div class="body"><div class="fader"><div class="fill" style="height:60%"></div><div class="knob" style="bottom:57%"></div></div>
+      <div class="mtr"><i style="height:0"></i></div></div>
+    <div class="val">60</div>
+    <div class="bs"><div class="b">MIC</div><div class="b">SPKR</div></div>
+  </div>
+  <div class="strip on">
+    <div class="hd">2</div><div class="tg">LANE 2</div>
+    <div class="body"><div class="fader"><div class="fill" style="height:65%"></div><div class="knob" style="bottom:62%"></div></div>
+      <div class="mtr"><i style="height:62%"></i></div></div>
+    <div class="val">65</div>
+    <div class="bs"><div class="b mic">MIC</div><div class="b spk">SPKR</div></div>
+  </div>
+  <div class="strip">
+    <div class="hd">3</div><div class="tg">LANE 3</div>
+    <div class="body"><div class="fader"><div class="fill" style="height:45%"></div><div class="knob" style="bottom:42%"></div></div>
+      <div class="mtr"><i style="height:0"></i></div></div>
+    <div class="val">45</div>
+    <div class="bs"><div class="b">MIC</div><div class="b">SPKR</div></div>
+  </div>
+  <div class="strip">
+    <div class="hd">4</div><div class="tg">LANE 4</div>
+    <div class="body"><div class="fader"><div class="fill" style="height:72%"></div><div class="knob" style="bottom:69%"></div></div>
+      <div class="mtr"><i style="height:18%"></i></div></div>
+    <div class="val">72</div>
+    <div class="bs"><div class="b mic">MIC</div><div class="b">SPKR</div></div>
+  </div>
+</main>
+<footer><span>Lane 2 mic live · Lane 4 mic live</span><span>v0.2.0</span></footer>
+</body></html>

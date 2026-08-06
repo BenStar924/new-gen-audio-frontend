@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>20 — Lane rows, all controllable (06 scaled)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#0e1116;color:#e6edf5;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;
+  background:#171c24;border-bottom:1px solid #2c3542}
+h1{font-size:16px;font-weight:600}
+.sub{font-size:10px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+main{flex:1;display:flex;flex-direction:column;gap:8px;padding:9px;min-height:0}
+.row{flex:1;display:flex;align-items:center;gap:9px;background:#171c24;border:1px solid #2c3542;
+  border-radius:12px;padding:8px 10px}
+.row.on{border-color:#2f81f7;background:#141c2b;box-shadow:inset 0 0 0 1px #2f81f7}
+.id{width:46px;display:flex;flex-direction:column;align-items:center;gap:1px}
+.id b{font-size:27px;font-weight:800;line-height:1}
+.row.on .id b{color:#7db3ff}
+.id small{font-size:8px;letter-spacing:.14em;color:#94a3b3;font-weight:800}
+.mid{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+.mt{display:flex;gap:2px;height:11px}
+.s{flex:1;border-radius:2px;background:#212936}
+.s.g{background:#2ea043}.s.a{background:#d29922}
+.vt{height:7px;border-radius:99px;background:#212936;overflow:hidden}
+.vt i{display:block;height:100%;border-radius:99px;background:#2f81f7}
+.b{width:78px;height:52px;border-radius:10px;border:1px solid #2c3542;background:#212936;
+  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;
+  letter-spacing:.1em;color:#94a3b3}
+.b.mic{background:#2ea043;border-color:#2ea043;color:#06210d}
+.b.spk{background:#d29922;border-color:#d29922;color:#241a00}
+.st{width:52px;height:52px;border-radius:10px;border:1px solid #2c3542;background:#212936;
+  font-size:24px;display:flex;align-items:center;justify-content:center}
+.v{width:40px;text-align:right;font-size:19px;font-weight:800}
+footer{background:#171c24;border-top:1px solid #2c3542;padding:5px 14px;display:flex;
+  justify-content:space-between;font-size:11px;color:#94a3b3}
+</style></head><body>
+<header><h1>Operator Console</h1><span class="sub">ALL LANES · READY · ⚙</span></header>
+<main>
+  <div class="row">
+    <div class="id"><b>1</b><small>LANE</small></div>
+    <div class="mid">
+      <div class="mt"><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i></div>
+      <div class="vt"><i style="width:60%"></i></div>
+    </div>
+    <div class="b">MIC</div><div class="b">SPKR</div>
+    <div class="st">−</div><div class="v">60</div><div class="st">+</div>
+  </div>
+  <div class="row on">
+    <div class="id"><b>2</b><small>LANE</small></div>
+    <div class="mid">
+      <div class="mt"><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s a"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i></div>
+      <div class="vt"><i style="width:65%"></i></div>
+    </div>
+    <div class="b mic">MIC</div><div class="b spk">SPKR</div>
+    <div class="st">−</div><div class="v">65</div><div class="st">+</div>
+  </div>
+  <div class="row">
+    <div class="id"><b>3</b><small>LANE</small></div>
+    <div class="mid">
+      <div class="mt"><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i></div>
+      <div class="vt"><i style="width:45%"></i></div>
+    </div>
+    <div class="b">MIC</div><div class="b">SPKR</div>
+    <div class="st">−</div><div class="v">45</div><div class="st">+</div>
+  </div>
+  <div class="row">
+    <div class="id"><b>4</b><small>LANE</small></div>
+    <div class="mid">
+      <div class="mt"><i class="s g"></i><i class="s g"></i><i class="s g"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i><i class="s"></i></div>
+      <div class="vt"><i style="width:72%"></i></div>
+    </div>
+    <div class="b mic">MIC</div><div class="b">SPKR</div>
+    <div class="st">−</div><div class="v">72</div><div class="st">+</div>
+  </div>
+</main>
+<footer><span>Lane 2 mic live · Lane 4 mic live</span><span>v0.2.0</span></footer>
+</body></html>

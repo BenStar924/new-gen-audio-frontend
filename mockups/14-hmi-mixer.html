@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>14 — HMI mixer strips (06×04)</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:800px;height:480px;overflow:hidden;background:#0a0a0a;color:#e8e8e8;
+  font-family:ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;
+  background:#141414;border-bottom:3px solid #333;font-size:12px;letter-spacing:.2em}
+.led{width:12px;height:12px;border-radius:50%;background:#22c55e;box-shadow:0 0 9px #22c55e;
+  display:inline-block;vertical-align:-1px;margin-right:7px;border:2px solid #0a0a0a}
+main{flex:1;display:flex;gap:6px;padding:6px;min-height:0}
+.strip{flex:1;border:3px solid #333;background:#111;display:flex;flex-direction:column}
+.strip.on{border-color:#ffb000}
+.st{background:#333;padding:4px 7px;display:flex;justify-content:space-between;align-items:center;
+  font-size:10px;letter-spacing:.16em;color:#c9c9c9}
+.strip.on .st{background:#ffb000;color:#141414}
+.leds{display:flex;gap:5px}
+.l{width:9px;height:9px;border-radius:50%;background:#1c1c1c;border:2px solid #000}
+.l.g{background:#22c55e;box-shadow:0 0 7px #22c55e}
+.l.a{background:#ffb000;box-shadow:0 0 7px #ffb000}
+.strip.on .l{border-color:#5c4000}
+.bd{flex:1;padding:7px;display:flex;flex-direction:column;align-items:center;gap:7px;min-height:0}
+.n{font-size:26px;font-weight:700;line-height:1}
+.strip.on .n{color:#ffb000}
+.body{flex:1;display:flex;gap:6px;width:100%;min-height:0}
+.fader{width:32px;border:2px solid #333;background:#000;position:relative}
+.fill{position:absolute;left:2px;right:2px;bottom:2px;background:#3b82f6}
+.strip.on .fill{background:#ffb000}
+.knob{position:absolute;left:-4px;right:-4px;height:10px;background:#8a8a8a;border:2px solid #000}
+.mtr{flex:1;border:2px solid #333;background:#000;position:relative;overflow:hidden}
+.mtr i{position:absolute;left:2px;right:2px;bottom:2px;background:linear-gradient(#dc2626,#ffb000 30%,#22c55e 62%)}
+.val{font-size:17px;font-weight:700;color:#ffb000}
+.bs{width:100%;display:flex;flex-direction:column;gap:5px}
+.b{height:36px;border:2px solid #333;background:#161616;display:flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:700;letter-spacing:.16em;color:#7a7a7a}
+.b.mic{border-color:#22c55e;color:#22c55e;background:#04220f}
+.b.spk{border-color:#ffb000;color:#ffb000;background:#231900}
+footer{background:#141414;border-top:3px solid #333;padding:5px 12px;display:flex;
+  justify-content:space-between;font-size:11px;color:#777;letter-spacing:.1em}
+</style></head><body>
+<header><span>OPERATOR CONSOLE</span><span><i class="led"></i>ALL LANES · ⚙</span></header>
+<main>
+  <div class="strip">
+    <div class="st"><span>L01</span><span class="leds"><i class="l"></i><i class="l"></i></span></div>
+    <div class="bd"><div class="n">1</div>
+      <div class="body"><div class="fader"><div class="fill" style="height:60%"></div><div class="knob" style="bottom:58%"></div></div>
+        <div class="mtr"><i style="height:0"></i></div></div>
+      <div class="val">060</div>
+      <div class="bs"><div class="b">MIC</div><div class="b">SPKR</div></div></div>
+  </div>
+  <div class="strip on">
+    <div class="st"><span>L02</span><span class="leds"><i class="l g"></i><i class="l a"></i></span></div>
+    <div class="bd"><div class="n">2</div>
+      <div class="body"><div class="fader"><div class="fill" style="height:65%"></div><div class="knob" style="bottom:63%"></div></div>
+        <div class="mtr"><i style="height:62%"></i></div></div>
+      <div class="val">065</div>
+      <div class="bs"><div class="b mic">MIC</div><div class="b spk">SPKR</div></div></div>
+  </div>
+  <div class="strip">
+    <div class="st"><span>L03</span><span class="leds"><i class="l"></i><i class="l"></i></span></div>
+    <div class="bd"><div class="n">3</div>
+      <div class="body"><div class="fader"><div class="fill" style="height:45%"></div><div class="knob" style="bottom:43%"></div></div>
+        <div class="mtr"><i style="height:0"></i></div></div>
+      <div class="val">045</div>
+      <div class="bs"><div class="b">MIC</div><div class="b">SPKR</div></div></div>
+  </div>
+  <div class="strip">
+    <div class="st"><span>L04</span><span class="leds"><i class="l g"></i><i class="l"></i></span></div>
+    <div class="bd"><div class="n">4</div>
+      <div class="body"><div class="fader"><div class="fill" style="height:72%"></div><div class="knob" style="bottom:70%"></div></div>
+        <div class="mtr"><i style="height:18%"></i></div></div>
+      <div class="val">072</div>
+      <div class="bs"><div class="b mic">MIC</div><div class="b">SPKR</div></div></div>
+  </div>
+</main>
+<footer><span>L02 MIC LIVE · L04 MIC LIVE</span><span>REV 0.2.0</span></footer>
+</body></html>
