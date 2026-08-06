@@ -12,6 +12,15 @@ React. ESLint ignores this directory.
 
 ```
 operatorconsole/
+  src/
+    main.c              # entry point, console state, config persistence
+    webserver.c/.h      # libmicrohttpd: static files + /api endpoints
+    console.h           # shared state, guarded by a mutex
+    hardware/
+      hw.h              # the hardware interface
+      gpio.c            # libgpiod v2 + PWM backlight
+      i2c.c             # /dev/i2c-1
+      spi.c             # /dev/spidev0.*
   www/
     index.html          # markup + Alpine bindings
     app.js              # Alpine component: state, polling, actions
@@ -20,10 +29,50 @@ operatorconsole/
       alpine.min.js     # vendored Alpine 3.15.0
   input.css             # Tailwind source (v4 CSS-first config)
   build-css.sh          # one-time CSS build
-  dev-server.py         # mock backend for development (not deployed)
+  dev-server.py         # mock backend for front-end work (not deployed)
   kiosk.sh              # cog launch + backend wait + auto-restart
+  CMakeLists.txt
+  toolchain-pi.cmake
   README.md
 ```
+
+## Building the application
+
+On the Pi (or any Linux box, for development):
+
+```sh
+sudo apt install libmicrohttpd-dev libgpiod-dev cmake
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/operatorconsole --port 8000 --www www
+```
+
+**libgpiod v2 is required.** Raspberry Pi OS Trixie ships 2.2.x as
+`libgpiod-dev`; the v1 API is neither available on Trixie nor compatible, and
+CMake enforces the floor (`libgpiod>=2.0`) rather than letting it surface as a
+wall of compile errors. Note `libgpiod3` (runtime) is installed by default but
+`libgpiod-dev` (headers, linker symlink, pkg-config metadata) is not.
+
+Cross-compiling from WSL2 for the board:
+
+```sh
+sudo apt install crossbuild-essential-arm64
+cmake -B build-pi -DCMAKE_TOOLCHAIN_FILE=toolchain-pi.cmake \
+      -DPI_SYSROOT=$HOME/pi-sysroot
+cmake --build build-pi
+rsync -az build-pi/operatorconsole www/ pi@console.local:~/operatorconsole/
+```
+
+`PI_SYSROOT` needs the target's headers and libraries — rsync `/usr/include`
+and `/usr/lib` off a running board. Without it pkg-config reports the build
+machine's x86-64 flags and the link fails with what look like missing symbols.
+
+The build runs with `-Wall -Wextra -Wpedantic -Werror`: on a device that runs
+unattended for months, a warning is a defect that has not surfaced yet.
+
+Without a `/dev/gpiochip0` the program still runs, reports
+`"hardware": false` at `/api/status`, and tracks state without driving pins —
+so the UI can be worked on anywhere. It says so rather than pretending.
 
 ## Running it
 
@@ -33,9 +82,11 @@ python3 dev-server.py 8000 --lanes 7         # try an odd lane count
 python3 dev-server.py --layout bottom        # start with the control rail
 ```
 
-`dev-server.py` serves `www/` and implements the API below against in-memory
-state, with a simulated per-lane audio level so the meter moves. Use it on a
-laptop, or on the bench card before the C backend exists.
+`dev-server.py` serves `www/` and implements the same API against in-memory
+state, with a simulated audio level so the meter moves. It is a front-end
+development tool and is **not deployed** — the C application above is what
+ships. Its one advantage is the simulated meter, which the C build cannot yet
+produce (see below).
 
 On the device, once the C backend is serving port 8000:
 
@@ -253,6 +304,25 @@ double-tap zoom and tap highlighting are disabled, and the shell never scrolls.
 2.0 and has no frames to spare; press feedback needs to be immediate rather than
 eased.
 
+## What the hardware layer does not do yet
+
+Two things are deliberately **unimplemented rather than faked**, because the
+environment guide does not document the XVF3800 register map:
+
+- `hw_audio_level()` returns -1 (no reading). The meter therefore reads zero on
+  the real backend. `dev-server.py` simulates a level; the C build does not.
+- `hw_set_volume()` returns -1 on real hardware. The value is accepted, stored
+  and persisted, and the status line says *"not applied (no gain driver)"*.
+
+A meter that invents a level, or a volume control that reports success without
+moving anything, is worse than one that admits it has no reading — the UI was
+built specifically to show what reaches the speakers.
+
+Also note `hw_select_lane()` refuses lanes above 4. The mux is two select lines
+(GPIO12/16 per config.txt), so it addresses four lanes; a site configured for
+more needs additional select lines in hardware. Silently routing lane 5 to
+lane 1 would be worse than refusing.
+
 ## Open questions
 
 - **Lane labels.** Buttons show the lane number. Do lanes have real names at a
@@ -262,10 +332,15 @@ eased.
   or to move out of the console UI entirely.
 - **What else belongs on the main screen?** There's room beside the audio card,
   and at a single lane most of the screen is free.
-- **Are mic and speakers really per-lane?** The hardware guide describes a
-  single amplifier mute (GPIO25) and a single mic enable (GPIO24), which points
-  at those being console-wide too — the same correction that moved volume out of
-  the lane object. Left per-lane for now because only volume was corrected.
+- **Are mic and speakers really per-lane?** This is now the largest open
+  question, because the C application had to take a position to compile at all.
+  The board has ONE amplifier mute (GPIO25) and ONE mic enable (GPIO24), so
+  `main.c` applies only the *active* lane's state to the pins and remembers the
+  rest, re-applying on selection. That is the only coherent reading of a
+  per-lane UI on single-channel hardware. If mic and speakers are meant to be
+  console-wide — as master volume turned out to be — then the per-lane state
+  should collapse to a single pair and the UI should stop drawing per-lane
+  indicators. Worth settling before more is built on this contract.
 - **Should control position be per-operator or per-site?** It is currently one
   device-wide setting, like lane count. If two people share a console on
   different shifts they will fight over it.
