@@ -342,6 +342,66 @@ double-tap zoom and tap highlighting are disabled, and the shell never scrolls.
 2.0 and has no frames to spare; press feedback needs to be immediate rather than
 eased.
 
+## Pin map — check this against the wiring
+
+Everything this program drives, in one place. **Three of these are inferences,
+not statements from the environment guide** — they are the only places the code
+and the board can silently disagree, so they are marked and should be confirmed
+before first power-on.
+
+| Function | BCM | Header pin | Direction | Boot state | Source |
+| --- | --- | --- | --- | --- | --- |
+| Amplifier mute | GPIO25 | 22 | out | **HIGH = muted** | guide (`gpio=25=op,dh`) |
+| Mic enable | GPIO24 | 18 | out | LOW = off | guide (`gpio=24=op,dl`) |
+| XVF3800 reset | GPIO19 | 35 | out | LOW = de-asserted | guide (`gpio=19=op,dl`) |
+| Lane mux A | GPIO12 | 32 | out | LOW | **inferred** |
+| Lane mux B | GPIO16 | 36 | out | LOW | **inferred** |
+| Status LED | GPIO26 | 37 | out | LOW = off | **inferred** |
+| Backlight PWM | GPIO18 | 12 | PWM | — | guide (`dtoverlay=pwm,pin=18,func=2`) |
+| I2C1 SDA / SCL | GPIO2 / GPIO3 | 3 / 5 | — | — | guide (`dtparam=i2c_arm=on`) |
+| SPI0 MOSI/MISO/SCLK | GPIO10/9/11 | 19/21/23 | — | — | guide (`dtparam=spi=on`) |
+| SPI0 CE0 / CE1 | GPIO8 / GPIO7 | 24 / 26 | driver-owned | idle high | guide — **never driven by this code** |
+
+### The three inferences
+
+`config.txt` has one line covering five pins:
+
+```
+gpio=12,16,22,26,27=op,dl   # mux A/B, pin 15, LED, pin 13 -> low
+```
+
+The comment lists four labels for five pins, so the mapping is read positionally:
+GPIO12 and GPIO16 are mux A and B, GPIO22 is "pin 15" (its own header number),
+GPIO26 is the LED, GPIO27 is "pin 13". That reading is consistent — GPIO22 *is*
+header pin 15 and GPIO27 *is* header pin 13 — but it is still a reading.
+
+**If the LED is not GPIO26, or the mux lines are not GPIO12/16, or A and B are
+swapped, this code drives the wrong pins.** All three live in `src/hardware/hw.h`
+as one-line `#define`s; nothing else needs to change.
+
+### Pins deliberately left alone
+
+`config.txt` also configures GPIO4, 5, 6, 13, 17, 20, 21, 22, 23 and 27 —
+inputs with pull-ups, a rising-edge input, an external-pull-up input, and two
+unnamed outputs. **This program requests none of them.** They are free for the
+hardware engineer to claim without conflicting with the console: libgpiod
+requests are exclusive, so two processes cannot hold the same line.
+
+### Lane count vs. mux width
+
+Two select lines address **four** lanes. `hw_select_lane()` refuses anything
+above 4 and logs why, rather than wrapping lane 5 onto lane 1 — but the UI
+allows up to 8 lanes. **A site with more than four lanes needs more select lines
+in hardware**, and `HW_MUX_LANES` in `hw.h` needs to match.
+
+### What the UART setup is for
+
+`config.txt` sets `enable_uart=1`, `dtoverlay=disable-bt` to give GPIO14/15 the
+real PL011 as `ttyAMA0`, and `cmdline.txt` drops `console=serial0,115200` so a
+getty does not hold the port. **This program never opens it.** The guide says
+the hardware layer owns the UART; that part is not written. If something needs
+serial, it is a new `src/hardware/uart.c` plus a few entries in `hw.h`.
+
 ## What the hardware layer does not do yet
 
 Two things are deliberately **unimplemented rather than faked**, because the
