@@ -112,8 +112,18 @@ python3 dev-server.py --layout bottom        # start with the control rail
 `dev-server.py` serves `www/` and implements the same API against in-memory
 state, with a simulated audio level so the meter moves. It is a front-end
 development tool and is **not deployed** — the C application above is what
-ships. Its one advantage is the simulated meter, which the C build cannot yet
-produce (see below).
+ships. Its advantages are the simulated meter, which the C build cannot yet
+produce (see below), and the `/api/sim*` endpoints that put lanes into `busy`,
+`hold` and `error` without a second console on the wire. Config password `1234`,
+developer password `9999`.
+
+The C application takes the same shape:
+
+```sh
+./build/operatorconsole --port 8000 --www www \
+    --config /var/lib/operatorconsole/config \
+    --theme  /var/lib/operatorconsole/theme.json
+```
 
 On the device, once the C backend is serving port 8000:
 
@@ -158,7 +168,7 @@ cp package/dist/cdn.min.js www/vendor/alpine.min.js
 
 ## Lanes and audio
 
-A console has **1–8 lanes**. A lane is a **routing destination**, not an audio
+A console has **1–12 lanes**. A lane is a **routing destination**, not an audio
 channel — because the hardware has one of everything: one amplifier mute
 (GPIO25), one microphone enable (GPIO24), one master volume.
 
@@ -178,10 +188,6 @@ So the model is:
   which is what lets an operator cut the microphone without giving up the lane.
   Selecting any lane re-opens both.
 
-Nothing is per-lane, so lane tiles carry no per-lane indicators: the held tile
-shows a `LIVE` pill when the mic is open, and its meter is the only one that
-can move.
-
 Ordering is deliberate wherever the amplifier is touched: **mute first, always**.
 The amp must never be live while the mux is mid-change, and must not come out
 of mute before routing settles — either puts a click through the speakers.
@@ -189,11 +195,45 @@ of mute before routing settles — either puts a click through the speakers.
 The selected lane is **not** persisted across a restart. A console that came
 back from a power cut with a microphone already open would be a nasty surprise.
 
-**Sizing correction.** The lane count is site-configurable *and* the lane area
-changes shape with the control position, so the grid can't be a fixed template.
-`app.js` picks the column count that squares up best for both, and the flex rule
-in `input.css` lets a short final row stretch to fill the width, so odd counts
-read as deliberate rather than ragged:
+### Lane states and who owns a lane
+
+Several consoles compete for the same lanes, and **the Master Controller
+arbitrates** — this console does not decide what it gets. Each lane arrives in
+`/api/status` with a status:
+
+| `status` | Meaning | Selectable? |
+| --- | --- | --- |
+| `idle` | Nobody has it | yes |
+| `self` | **This** console is talking to it | yes — tapping releases |
+| `busy` | Another console is talking to it | **no** |
+| `hold` | Another console parked it | **yes** — taking it is the point of hold |
+| `error` | Faulted, out of service | no, greyed |
+
+`busy` and `hold` differ precisely because the spec asks them to: a lane someone
+is *talking* to must not be seized, while a lane someone *parked* is exactly the
+one a second operator should be able to pick up.
+
+Because ownership is granted rather than assumed, **a tap is a request**. The UI
+posts to `/api/lane` and waits for the next poll to confirm, holding a brief
+pending state in between. A refused grab comes back `409` with the reason in the
+body, and that reason is what the status line shows — it never flickers as
+success first.
+
+Volume is split the way the hardware is: **one console-wide volume** for what
+the operator hears (there is one amplifier), and a **per-lane outgoing volume**
+for what the customer hears at the lane, set once at install on the
+configuration screen.
+
+**Hold** parks the held lane. Audio drops — mic off, speakers muted, meter at
+zero — but the lane stays this console's until another console takes it.
+
+### Sizing correction
+
+The lane count is site-configurable *and* the lane area changes shape with the
+control position, so the grid can't be a fixed template. `app.js` picks the
+column count that squares up best for both, and the flex rule in `input.css`
+lets a short final row stretch to fill the width, so odd counts read as
+deliberate rather than ragged:
 
 | Lanes | Controls at a side | Controls at the bottom |
 | --- | --- | --- |
@@ -203,8 +243,6 @@ read as deliberate rather than ragged:
 | 4 | 2 + 2 | 2 + 2 |
 | 5 | 2 + 2 + 1 | 3 + 2 |
 | 6 | 3 + 3 | 3 + 3 |
-| 7 | 3 + 3 + 1 | 4 + 3 |
-| 8 | 3 + 3 + 2 | 4 + 4 |
 
 Two mappings because the shape differs: with controls at the bottom the lane
 area is wide and short, so lanes spread out; at a side it is narrower and
@@ -212,10 +250,15 @@ taller, so fewer columns keeps tiles from going skinny. At one lane the selector
 is hidden — a one-option selector is noise — and the audio card is capped and
 centred rather than stretched edge to edge.
 
-Every lane tile carries a small meter and two status dots, so a live lane is
-visible without selecting it. When the bottom rail squeezes the grid into more
-than one row the `LANE n` sublabel is dropped: the numeral already identifies
-the lane, and the label is the first thing worth losing to keep tiles whole.
+**Past six lanes the grid splits into tabs**, six per tab, and the table above
+applies within a tab. A lane on the tab you are not looking at can be live,
+busy or faulted, so **each tab header carries a status dot** showing the worst
+state among its lanes — otherwise tabs would hide exactly the thing the operator
+needs to see.
+
+Each lane tile carries a **colour tag as a small corner square**, configured per
+lane. A square in the corner rather than the tile's fill, so a site's colour
+coding cannot collide with the state colours above.
 
 ## Control position
 
@@ -229,59 +272,165 @@ the lane grid and control cluster are the same markup in every position. In the
 bottom position the cluster becomes a true rail — its heading and meter turn
 vertical rather than eating the height the lane grid needs.
 
-Verified at 800×480 in all three positions across every lane count 1–8: no
-ragged rows, no clipped tiles, no overflow, and every control at or above the
-64px touch minimum (smallest lane tile 141×78).
+Verified at 800×480 in all three positions across every lane count 1–12 and
+both tabs, driven against the C backend with pointer events: no ragged rows, no
+tile clipped past its card's padding box, no overflow, and every control at or
+above the 44px minimum (smallest lane tile 208×85).
 
-Lane count is set by the operator in Settings and persisted by the backend. The
-UI clamps 1–8 and posts the new count; the backend owns the real list, since it
+Lane count is set on the configuration screen and persisted by the backend. The
+UI clamps 1–12 and posts the new count; the backend owns the real list, since it
 has to add or drop hardware state.
+
+## Screens
+
+Four screens live in **one document**, switched by an Alpine `screen` value.
+No page loads: a reload costs seconds of WPE startup, which is the wrong price
+for opening a settings screen.
+
+| Screen | Reached from | Gate |
+| --- | --- | --- |
+| `main` | — | none |
+| `troubleshooting` | Settings | **none** — a technician in front of a broken console should not need a password to read the logs |
+| `config` | Settings | password |
+| `developer` | Troubleshooting | separate password |
+
+Passwords are checked by the backend at `/api/auth` and **never sent to the UI**.
+Leaving a protected screen re-locks it: an installer who walks away should not
+leave the configuration open behind them.
+
+**No physical keyboard exists on a deployed console**, so every text and number
+entry goes through the on-screen keyboard modal — numeric pad or full alpha,
+chosen per field. Keys are 56px and above.
+
+## Theming — colours are data, not code
+
+**Marketing and Sales have not approved a palette, and production is late 2027.**
+So no colour is baked into the build. Tailwind v4 theme tokens compile to CSS
+custom properties, which means a palette is a **runtime value**: the backend
+serves one and `app.js` applies it with `setProperty`. Marketing can restyle the
+product without a developer touching the code, and development does not wait on
+approval.
+
+A theme file is a flat JSON object of token names **without** the `--color-`
+prefix, which the UI adds:
+
+```json
+{ "navy": "#7A1F3D", "lane-self": "#7A1F3D", "lane-self-line": "#4E1226" }
+```
+
+Pass one with `--theme PATH` (default `/var/lib/operatorconsole/theme.json`).
+It is validated at load — a file that is not a JSON object is ignored with a log
+line rather than breaking every poll — and served verbatim in `theme`. Values
+are filtered UI-side to colour-shaped strings. With no theme file the
+stylesheet's compiled defaults stand.
+
+A **template** for a vertical (Bank, Pharmacy) is then just a theme file plus a
+title and lane labels. There is no layout branch per vertical, so templates do
+not multiply the test matrix.
 
 ## API contract
 
 The front end holds no authority over hardware state. It polls `GET
 /api/status` once a second, mirrors what comes back, and POSTs commands. This is
-the contract the C backend needs to implement.
+the contract shared with the C backend; `dev-server.py` implements the same one.
 
 `GET /api/status` → JSON. Every field optional; the UI keeps its current value
 for anything omitted, so a partial response never blanks a control.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `lanes` | int | Lane **count** at this site (1–8) |
-| `lane` | int | Held lane, 1-based — **0 means none** |
+| `online` | bool | Master Controller link up |
+| `title` | string | Configurable screen title |
+| `lanes` | **array** | One object per lane (below) |
+| `lane` | int | Lane held by **this** console, 1-based — **0 means none** |
+| `held` | bool | This console's lane is parked on hold |
 | `mic` | bool | Microphone enabled (GPIO24) — console-wide |
 | `mute` | bool | Amplifier muted (GPIO25, active high) — console-wide |
-| `level` | int | 0–100 for the meter; 0 when no lane is held |
-| `volume` | int | 0–100 master volume |
+| `level` | int | 0–100 for the meter; 0 with no lane held or on hold |
+| `volume` | int | 0–100 master volume — what the **operator** hears |
 | `brightness` | int | 0–100 |
+| `audio_out` | string | `speaker` or a module id |
+| `modules` | array | Add-on modules **fitted**: `{id, name}`, 0–2 |
 | `layout` | string | Control position: `left`, `right` or `bottom` |
+| `theme` | object | Colour tokens, applied at runtime |
+| `user_mgmt` | bool | Reserved; `false` in v1 |
 | `hardware` | bool | False when running without a gpiochip |
 | `message` | string | Status line text |
 
-There is no per-lane state at all. `lanes` is a count, not an array.
+Each entry in `lanes`:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | int | 1-based |
+| `label` | string | Configurable name, ≤23 chars |
+| `tag` | string | Colour tag: `none`/`red`/`blue`/`green`/`yellow`/`purple` |
+| `status` | string | `idle`/`self`/`busy`/`hold`/`error` |
+| `owner` | string \| null | Which console holds it, for display |
+| `out_volume` | int | 0–100 heard **at the lane** |
+
+`GET /api/logs` → `{"entries": [{"t", "level", "text"}]}`, **newest first**,
+last 50 only. The SD card is not a log server.
 
 Commands, all `POST` with a JSON body, all returning `{"ok": true}`:
 
 | Endpoint | Body | Notes |
 | --- | --- | --- |
-| `/api/lane` | `{"lane": 3}` | Selects and opens. `0` — or the lane already held — releases |
+| `/api/lane` | `{"lane": 3}` | A **request**. `0` — or the lane already held — releases. `409` + reason when the lane is busy or faulted |
+| `/api/hold` | `{"on": true}` | Parks the held lane. `409` when none is held |
 | `/api/mic` | `{"on": true}` | No lane id. `409` when no lane is held |
 | `/api/mute` | `{"on": false}` | No lane id. `409` when no lane is held |
-| `/api/volume` | `{"value": 65}` | Master volume |
+| `/api/volume` | `{"value": 65}` | Console-wide |
 | `/api/brightness` | `{"value": 80}` | |
-| `/api/lanes` | `{"count": 6}` | Shrinking below the held lane releases it |
+| `/api/audio-out` | `{"id": "headset"}` | `400` for a module that is not fitted |
 | `/api/layout` | `{"position": "bottom"}` | |
+| `/api/lanes` | `{"count": 6}` | Shrinking below the held lane releases it |
+| `/api/lane-config` | `{"lane": 2, "label": …, "tag": …, "out_volume": …}` | Each field independent |
+| `/api/title` | `{"text": "Main Branch"}` | |
+| `/api/auth` | `{"scope": "config", "password": "…"}` | `403` on a wrong password. Scope is `config` or `developer` |
 
-No command except `/api/lane` carries a lane id, which is what makes it
-structurally impossible to apply a console-wide setting to a single lane by
-mistake.
+No command except `/api/lane`, `/api/lane-config` and `/api/sim` carries a lane
+id, which is what makes it structurally impossible to apply a console-wide
+setting to a single lane by mistake.
+
+`dev-server.py` additionally implements `/api/sim`, `/api/sim-online`,
+`/api/sim-theme` and `/api/sim-modules` so every lane state is reachable without
+a real multi-console site. **The C backend does not** — those are a development
+tool, not a device feature.
 
 Controls are optimistic: a tap updates the UI immediately, then POSTs. The next
 poll reconciles against the hardware's real state, so a rejected or failed
 command corrects itself within a second rather than leaving the UI lying about
 the amplifier. Requests abort after 2s so a hung call can't stack up behind the
-poll interval.
+poll interval. **Lane selection is the exception** — it is arbitrated, so it
+waits for confirmation rather than assuming.
+
+## Device configuration file
+
+`--config PATH` (default `/var/lib/operatorconsole/config`), written atomically
+via a temp file and rename so a power cut leaves the previous config intact:
+
+```
+lanes=6
+layout=bottom
+title=Main Branch
+volume=60
+brightness=80
+audio_out=headset
+module1=headset:Headset
+lane2_label=Bay A
+lane2_tag=red
+lane2_out=55
+pw_config=1234
+pw_developer=9999
+```
+
+`module1`/`module2` declare which add-on modules are fitted, and the UI draws a
+button only for what is listed — **an absent module's button never renders**.
+This is where hardware detection replaces the installer setting when the probe
+lands; nothing above it has to change.
+
+**The default passwords in the source are placeholders.** A real deployment sets
+`pw_config` and `pw_developer` in this file at install.
 
 ## Design decisions
 
@@ -387,12 +536,14 @@ unnamed outputs. **This program requests none of them.** They are free for the
 hardware engineer to claim without conflicting with the console: libgpiod
 requests are exclusive, so two processes cannot hold the same line.
 
-### Lane count vs. mux width
+### Lane count vs. mux width — flag this before boards are made
 
-Two select lines address **four** lanes. `hw_select_lane()` refuses anything
-above 4 and logs why, rather than wrapping lane 5 onto lane 1 — but the UI
-allows up to 8 lanes. **A site with more than four lanes needs more select lines
-in hardware**, and `HW_MUX_LANES` in `hw.h` needs to match.
+Two select lines (GPIO12/16) address **four** lanes. `hw_select_lane()` refuses
+anything above 4 and logs why, rather than wrapping lane 5 onto lane 1 — but the
+GUI spec calls for **twelve**, which needs **four select lines**.
+`HW_MUX_LANES` in `hw.h` must match whatever is actually wired. This is a
+hardware change, not a software one, and it is cheap now and expensive after a
+board spin.
 
 ### What the UART setup is for
 
@@ -421,13 +572,43 @@ Also note `hw_select_lane()` refuses lanes above 4. The mux is two select lines
 more needs additional select lines in hardware. Silently routing lane 5 to
 lane 1 would be worse than refusing.
 
+## Not viable as specified
+
+**The embedded LLM ("a small AI like llama") cannot run on this board.** The
+Pi Zero 2 W has 512 MB and could not start Chromium — the environment guide
+documents sustained swap thrashing at 16–39 MB/s. The smallest useful quantised
+model needs several times this board's total RAM, and the device is offline, so
+a hosted model is out too.
+
+The recommendation is a **static troubleshooting decision tree** — "if this
+symptom, check these three things". It is a few KB, needs no inference, runs
+instantly, and is more predictable for a field technician than a small model's
+guesses. A wrong confident answer about why a bank's drive-thru is down is worse
+than no answer.
+
+**Launching a terminal needs a decision.** Cog runs with no window manager, so
+there is no window for a terminal to open into. The realistic options are for
+the backend to `chvt` to a VT with a getty (needs privileges), or to run a
+terminal emulator under `cage` alongside the kiosk. A browser-based terminal is
+the wrong answer on a device that ships to banks. The developer screen currently
+shows the button **disabled with that explanation on screen**, rather than a
+control that does nothing.
+
+**Logo upload has no path yet.** The kiosk has no file manager. Either the
+configuration screen enumerates a USB stick, or logos are pushed during install
+over the network. Whichever it is, size and format limits must be enforced by
+the backend — not by trusting the UI.
+
 ## Open questions
 
-- **Lane labels.** Buttons show the lane number. Do lanes have real names at a
-  site ("Bay A", a customer name), and if so where do they come from?
-- **Who may change the lane count?** It's in Settings with no gate. If an
-  operator shouldn't be able to reconfigure the site mid-shift, this needs a PIN
-  or to move out of the console UI entirely.
+- **Does console 1 hold the only configuration screens?** Unresolved in the
+  spec. Since the Master Controller already arbitrates lanes, it is the natural
+  place to hold site configuration too — that avoids a console-to-console
+  protocol existing only for settings. Right now every console has its own.
+- **User management.** `user_mgmt` is reserved in the API and `false` in v1.
+  Who are the users — operators, installers, technicians — and does a login
+  gate the main screen or only the protected screens? A console an operator has
+  to log into every shift is a different product from one that is always on.
 - **What else belongs on the main screen?** There's room beside the audio card,
   and at a single lane most of the screen is free.
 - **Should control position be per-operator or per-site?** It is currently one
@@ -437,6 +618,8 @@ lane 1 would be worse than refusing.
   probably deserves something louder.
 - **Brightness** is in the API but has no backend behind it yet — it needs a
   backlight path on the device.
+- **Detailed audio configuration** on the developer screen is marked TBD in the
+  spec and is not built.
 - **Panel size and orientation.** Built for 800×480 landscape. If the panel is
   physically rotated, set rotation at the KMS/kernel level, not in Cog.
 

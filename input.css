@@ -7,6 +7,13 @@
  * Tailwind v4, which uses this CSS-first config rather than the v3 @tailwind
  * directives and tailwind.config.js. Pin the major version: a v3 toolchain will
  * not read this file.
+ *
+ * COLOURS ARE PROVISIONAL. Marketing and Sales have not approved a palette, and
+ * production is not until late 2027. Every colour below is therefore a CSS
+ * custom property that app.js can overwrite at runtime from a theme the backend
+ * supplies — see applyTheme(). Nothing here needs a rebuild to restyle, and no
+ * colour may be written as a literal in markup or JS, or it will not follow the
+ * theme.
  */
 
 @import "tailwindcss";
@@ -17,7 +24,7 @@
 @source not "./www/vendor";
 
 @theme {
-  /* Hamilton brand. Navy sampled from the wordmark. */
+  /* --- brand chrome (provisional: Hamilton navy) --- */
   --color-navy:       #2B2A5E;
   --color-navy-d:     #1B1A3E;
   --color-navy-tint:  #B9B7E8;
@@ -32,14 +39,40 @@
   --color-dim:        #6B6E8C;
   --color-mute:       #94A0BB;
 
-  /* Status colours are deliberately NOT brand colours. Mic-live and speaker
-     state have to be distinguishable from navy and from each other at a
-     glance — a navy "live" indicator would vanish into the chrome. */
+  /* --- status --- */
+  /* Deliberately NOT brand colours: mic-live and speaker state have to be
+     distinguishable from the chrome and from each other at a glance. */
   --color-on:         #1F8A4C;
   --color-on-d:       #145F35;
   --color-warn:       #C77A10;
   --color-warn-d:     #8A540B;
   --color-danger:     #B3261E;
+
+  /* --- lane states ---
+     One token per state so a lane's appearance is a theme decision, not a code
+     decision. "self" is this console holding the lane; "busy" is another
+     console talking to it and cannot be taken; "hold" is another console
+     parking it and CAN be taken. */
+  --color-lane-idle:      #F5F6FA;
+  --color-lane-idle-line: #C9CDE0;
+  --color-lane-self:      #2B2A5E;
+  --color-lane-self-line: #1B1A3E;
+  --color-lane-busy:      #E7D9D8;
+  --color-lane-busy-line: #B3261E;
+  --color-lane-hold:      #FBF0DC;
+  --color-lane-hold-line: #C77A10;
+  --color-lane-error:     #E8E8ED;
+  --color-lane-error-line:#B6B6C2;
+
+  /* --- lane colour tags ---
+     Site-configurable identity for a lane ("the red lane"). Rendered as a small
+     corner square so it can never be confused with the button's state colour. */
+  --color-tag-red:    #C0392B;
+  --color-tag-blue:   #1F6FB2;
+  --color-tag-green:  #1F8A4C;
+  --color-tag-yellow: #D4A017;
+  --color-tag-purple: #6B4BA8;
+  --color-tag-none:   transparent;
 
   /* Touch targets are min-h-16 / min-w-16 (64px) throughout — the minimum
      comfortable finger target on a 7" panel. */
@@ -85,13 +118,13 @@
 @layer components {
   /* Lane sizing correction.
    *
-   * The lane count is site-configurable (1-8) and the lane area changes shape
-   * with the control position, so the grid can't be a fixed template. Flex
-   * basis is computed from --lane-cols, which app.js sets to the column count
-   * that squares up best for the current count *and* position. Because the
-   * items can also grow, a final row holding fewer than --lane-cols lanes
-   * stretches to fill the width instead of leaving a ragged gap — which is what
-   * makes odd counts (3, 5, 7) look deliberate rather than broken. */
+   * The lane count is site-configurable and the lane area changes shape with
+   * the control position, so the grid can't be a fixed template. Flex basis is
+   * computed from --lane-cols, which app.js sets to the column count that
+   * squares up best. Because the items can also grow, a final row holding
+   * fewer than --lane-cols lanes stretches to fill the width instead of
+   * leaving a ragged gap — which is what makes odd counts look deliberate
+   * rather than broken. */
   .lane-grid {
     --lane-gap: 0.6rem;
     display: flex;
@@ -112,10 +145,15 @@
     filter: brightness(0.92);
   }
 
-  /* Physical-feeling press: the raised button drops onto the page. Paired with
-     the offset shadow on .raised. */
+  /* Physical-feeling press: the raised button drops onto the page. */
   .raised.is-pressed {
     transform: translateY(2px);
     box-shadow: none !important;
+  }
+
+  /* A lane the Master Controller will not grant. Not a disabled attribute —
+     the button still reports why it cannot be taken. */
+  .lane-locked {
+    cursor: not-allowed;
   }
 }
