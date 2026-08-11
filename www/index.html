@@ -17,11 +17,13 @@
   <header class="flex items-center justify-between gap-3 px-4 py-2 bg-navy shrink-0">
     <div class="flex items-center gap-3 min-w-0">
       <svg class="w-9 h-9 shrink-0" viewBox="0 0 48 48" aria-hidden="true">
-        <!-- Placeholder mark until the customer's logo is supplied. The H
-             follows the theme rather than carrying its own hex, so it is not
-             the one thing left behind when the palette changes. -->
+        <!-- The Hamilton mark is ALWAYS Hamilton navy. It is a brand asset,
+             not chrome, so it is deliberately the one thing on this screen a
+             runtime theme cannot repaint — hence a literal hex rather than a
+             token. It sits on a white plate so it stays legible whatever
+             palette surrounds it. -->
         <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
-        <path class="fill-navy" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
+        <path fill="#2B2A5E" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
       </svg>
       <div class="leading-none min-w-0">
         <h1 class="text-lg font-extrabold tracking-[0.1em] text-white truncate" x-text="title">Operator Console</h1>
