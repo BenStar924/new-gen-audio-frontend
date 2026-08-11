@@ -65,6 +65,15 @@ document.addEventListener("alpine:init", function () {
 
       tab: 0,
       message: "Starting…",
+
+      /* A refusal has to survive the next poll. The backend's own message is
+         whatever is true right now ("No lane selected"), so without this a
+         "lane is in use" notice is wiped inside a second and the tap reads as
+         a broken screen — the exact thing saying why was meant to prevent. */
+      notice: "",
+      noticeUntil: 0,
+      noticeMs: 4000,
+
       settingsOpen: false,
       backendHost: window.location.host,
 
@@ -87,6 +96,13 @@ document.addEventListener("alpine:init", function () {
 
       get hasLane() {
         return this.activeLaneId >= 1;
+      },
+
+      /* The status line. Re-evaluated on every poll, so an expired notice
+         gives way to the backend's own message within a second. */
+      get statusLine() {
+        if (this.notice && Date.now() < this.noticeUntil) return this.notice;
+        return this.message;
       },
 
       get tabCount() {
@@ -238,9 +254,18 @@ document.addEventListener("alpine:init", function () {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
         }).catch(function (error) {
-          self.message = error.message || ("Command failed: " + path);
+          /* Includes the Master Controller's reason for refusing a lane, which
+             arrives as the body of a 409. */
+          self.say(error.message || ("Command failed: " + path));
           throw error;
         });
+      },
+
+      /* Shows text in the status line for a few seconds, outranking whatever
+         the backend reports in the meantime. */
+      say: function (text) {
+        this.notice = text;
+        this.noticeUntil = Date.now() + this.noticeMs;
       },
 
       poll: function () {
@@ -254,12 +279,20 @@ document.addEventListener("alpine:init", function () {
           .catch(function () {
             self.connected = false;
             self.online = false;
+            /* Losing the backend outranks any notice still on screen — it is
+               the more important thing to be telling the operator. */
+            self.notice = "";
             self.message = "No response from backend";
           });
       },
 
       applyStatus: function (data) {
         if (!data || typeof data !== "object") return;
+
+        /* Expiry has to be an assignment, not just a comparison in the getter:
+           Alpine re-runs an effect when a value it read changes, and a clock
+           passing a deadline changes nothing it is watching. */
+        if (this.notice && Date.now() >= this.noticeUntil) this.notice = "";
 
         if (Array.isArray(data.lanes)) this.lanes = data.lanes;
         if (typeof data.lane === "number") {
@@ -302,9 +335,9 @@ document.addEventListener("alpine:init", function () {
         if (lane.status === "busy" || lane.status === "error") {
           /* Say why rather than doing nothing — a dead tap reads as a broken
              screen. */
-          this.message = lane.status === "busy"
+          this.say(lane.status === "busy"
             ? lane.label + " is in use by " + (lane.owner || "another console")
-            : lane.label + " is out of service";
+            : lane.label + " is out of service");
           return;
         }
 

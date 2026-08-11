@@ -39,6 +39,13 @@
   --color-dim:        #6B6E8C;
   --color-mute:       #94A0BB;
 
+  /* Emphasised text on a light surface — button labels, headings. Same value
+     as --color-navy today, but a SEPARATE token on purpose: navy is also the
+     masthead background, and one token cannot be a background and a foreground
+     at once. A dark palette has to move them in opposite directions, so a
+     theme that overloaded them could not be made legible. */
+  --color-ink:        #2B2A5E;
+
   /* --- status --- */
   /* Deliberately NOT brand colours: mic-live and speaker state have to be
      distinguishable from the chrome and from each other at a glance. */

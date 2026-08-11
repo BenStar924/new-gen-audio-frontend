@@ -199,7 +199,10 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
         if path == "/api/lane":
             ok, reason = select_lane(int(body.get("lane", 0)))
             if not ok:
-                state["message"] = reason
+                # The reason rides on the 409, not on state["message"] — it is
+                # a transient notice the UI holds for a few seconds, not a
+                # description of what the console is currently doing. The C
+                # backend behaves the same way.
                 return self.send_json({"error": reason}, status=409)
             return self.send_json({"ok": True})
 

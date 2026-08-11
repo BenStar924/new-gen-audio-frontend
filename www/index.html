@@ -17,8 +17,11 @@
   <header class="flex items-center justify-between gap-3 px-4 py-2 bg-navy shrink-0">
     <div class="flex items-center gap-3 min-w-0">
       <svg class="w-9 h-9 shrink-0" viewBox="0 0 48 48" aria-hidden="true">
+        <!-- Placeholder mark until the customer's logo is supplied. The H
+             follows the theme rather than carrying its own hex, so it is not
+             the one thing left behind when the palette changes. -->
         <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
-        <path d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z" fill="#2B2A5E"/>
+        <path class="fill-navy" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
       </svg>
       <div class="leading-none min-w-0">
         <h1 class="text-lg font-extrabold tracking-[0.1em] text-white truncate" x-text="title">Operator Console</h1>
@@ -176,16 +179,16 @@
         <div class="flex items-center gap-2.5 shrink-0" :class="railMode ? '' : 'justify-between'">
           <button type="button" aria-label="Volume down" :disabled="volume <= 0"
                   x-on:pointerup.prevent.throttle.150ms="nudgeVolume(-volumeStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
 
           <div class="flex flex-col items-center leading-none" :class="railMode ? 'w-24' : ''">
-            <span class="text-4xl font-extrabold tabular-nums text-navy" x-text="volume">60</span>
+            <span class="text-4xl font-extrabold tabular-nums text-ink" x-text="volume">60</span>
             <span class="mt-1 text-[10px] font-extrabold tracking-[0.14em] text-dim whitespace-nowrap">VOLUME</span>
           </div>
 
           <button type="button" aria-label="Volume up" :disabled="volume >= 100"
                   x-on:pointerup.prevent.throttle.150ms="nudgeVolume(volumeStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">+</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">+</button>
         </div>
 
         <!-- Only rendered for modules the backend says are fitted. -->
@@ -234,11 +237,11 @@
           <div class="flex items-center gap-2.5">
             <button type="button" aria-label="Fewer lanes" :disabled="lanes.length <= minLanes"
                     x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length - 1)"
-                    class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
+                    class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
             <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="lanes.length"></span>
             <button type="button" aria-label="More lanes" :disabled="lanes.length >= maxLanes"
                     x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length + 1)"
-                    class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
+                    class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
           </div>
         </div>
 
@@ -247,7 +250,7 @@
           <button type="button" aria-label="Edit title"
                   x-on:pointerup.prevent.throttle.250ms="editTitle()"
                   class="raised flex items-center justify-end min-h-16 px-4 rounded-xl border-2 border-line bg-alt max-w-[14rem] cursor-pointer">
-            <span class="truncate text-sm font-bold text-navy" x-text="title"></span>
+            <span class="truncate text-sm font-bold text-ink" x-text="title"></span>
           </button>
         </div>
 
@@ -283,11 +286,11 @@
             <div class="flex items-center gap-1">
               <button type="button" :aria-label="`Lane ${lane.id} out down`"
                       x-on:pointerup.prevent.throttle.150ms="setLaneField(lane, 'out_volume', Math.max(0, lane.out_volume - 5))"
-                      class="flex items-center justify-center w-11 min-h-11 rounded-lg border-2 border-line bg-alt text-xl leading-none text-navy cursor-pointer">&minus;</button>
+                      class="flex items-center justify-center w-11 min-h-11 rounded-lg border-2 border-line bg-alt text-xl leading-none text-ink cursor-pointer">&minus;</button>
               <span class="w-9 text-center text-xs font-extrabold tabular-nums" x-text="lane.out_volume"></span>
               <button type="button" :aria-label="`Lane ${lane.id} out up`"
                       x-on:pointerup.prevent.throttle.150ms="setLaneField(lane, 'out_volume', Math.min(100, lane.out_volume + 5))"
-                      class="flex items-center justify-center w-11 min-h-11 rounded-lg border-2 border-line bg-alt text-xl leading-none text-navy cursor-pointer">+</button>
+                      class="flex items-center justify-center w-11 min-h-11 rounded-lg border-2 border-line bg-alt text-xl leading-none text-ink cursor-pointer">+</button>
             </div>
           </div>
         </template>
@@ -303,10 +306,10 @@
       <div class="flex gap-2">
         <button type="button" aria-label="Refresh logs"
                 x-on:pointerup.prevent.throttle.250ms="loadLogs()"
-                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-line bg-alt text-xs font-extrabold text-navy cursor-pointer">REFRESH</button>
+                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-line bg-alt text-xs font-extrabold text-ink cursor-pointer">REFRESH</button>
         <button type="button" aria-label="Developer screen"
                 x-on:pointerup.prevent.throttle.250ms="unlock('developer')"
-                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-line bg-alt text-xs font-extrabold text-navy cursor-pointer">DEVELOPER</button>
+                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-line bg-alt text-xs font-extrabold text-ink cursor-pointer">DEVELOPER</button>
         <button type="button" aria-label="Close troubleshooting"
                 x-on:pointerup.prevent.throttle.250ms="leave()"
                 class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-white text-xs font-extrabold cursor-pointer">DONE</button>
@@ -355,7 +358,7 @@
            be worse than saying so. -->
       <div class="border-t-2 border-line pt-2.5">
         <button type="button" aria-label="Launch terminal" disabled
-                class="flex items-center justify-center min-h-16 px-5 rounded-xl border-2 border-line bg-alt text-sm font-extrabold text-navy opacity-45">LAUNCH TERMINAL</button>
+                class="flex items-center justify-center min-h-16 px-5 rounded-xl border-2 border-line bg-alt text-sm font-extrabold text-ink opacity-45">LAUNCH TERMINAL</button>
         <p class="mt-2 text-xs text-dim leading-relaxed">
           Not wired yet. Cog runs without a window manager, so a terminal needs
           either a VT switch from the backend (requires privileges) or a
@@ -390,11 +393,11 @@
         <div class="flex items-center gap-2.5">
           <button type="button" aria-label="Brightness down" :disabled="brightness <= 10"
                   x-on:pointerup.prevent.throttle.150ms="nudgeBrightness(-brightnessStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
           <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="brightness"></span>
           <button type="button" aria-label="Brightness up" :disabled="brightness >= 100"
                   x-on:pointerup.prevent.throttle.150ms="nudgeBrightness(brightnessStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-navy text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
+                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
         </div>
       </div>
 
@@ -403,10 +406,10 @@
       <div class="flex gap-2.5">
         <button type="button" aria-label="Open troubleshooting"
                 x-on:pointerup.prevent.throttle.250ms="go('troubleshooting')"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-navy cursor-pointer">Troubleshooting</button>
+                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">Troubleshooting</button>
         <button type="button" aria-label="Open configuration"
                 x-on:pointerup.prevent.throttle.250ms="unlock('config')"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-navy cursor-pointer">Configuration 🔒</button>
+                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">Configuration 🔒</button>
       </div>
 
       <button type="button" aria-label="Close settings"
@@ -431,7 +434,7 @@
             <template x-for="key in row" :key="key">
               <button type="button" :aria-label="`Key ${key === ' ' ? 'space' : key}`"
                       x-on:pointerup.prevent.throttle.120ms="kbKey(key)"
-                      class="raised flex items-center justify-center min-h-14 rounded-lg border-2 border-line bg-alt text-lg font-bold text-navy cursor-pointer"
+                      class="raised flex items-center justify-center min-h-14 rounded-lg border-2 border-line bg-alt text-lg font-bold text-ink cursor-pointer"
                       :class="key === ' ' ? 'w-32' : (kb.mode === 'number' ? 'w-20' : 'w-[3.9rem]')"
                       x-text="key === ' ' ? 'SPACE' : key"></button>
             </template>
@@ -442,10 +445,10 @@
       <div class="flex gap-2.5">
         <button type="button" aria-label="Backspace"
                 x-on:pointerup.prevent.throttle.120ms="kbBackspace()"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-navy cursor-pointer">DELETE</button>
+                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">DELETE</button>
         <button type="button" aria-label="Cancel entry"
                 x-on:pointerup.prevent.throttle.250ms="kbCancel()"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-navy cursor-pointer">CANCEL</button>
+                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">CANCEL</button>
         <button type="button" aria-label="Accept entry"
                 x-on:pointerup.prevent.throttle.250ms="kbAccept()"
                 class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-on-d bg-on text-white font-bold cursor-pointer">ENTER</button>
@@ -454,7 +457,7 @@
   </div>
 
   <footer class="flex items-center justify-between gap-3 px-4 py-1.5 bg-navy text-[11px] text-navy-tint shrink-0">
-    <span x-text="message">Starting&hellip;</span>
+    <span x-text="statusLine">Starting&hellip;</span>
     <span class="tabular-nums" x-text="`v${uiVersion}`"></span>
   </footer>
 
