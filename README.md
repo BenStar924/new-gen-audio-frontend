@@ -324,6 +324,28 @@ line rather than breaking every poll — and served verbatim in `theme`. Values
 are filtered UI-side to colour-shaped strings. With no theme file the
 stylesheet's compiled defaults stand.
 
+### Brand colour — a picker, not a hand-painted palette
+
+The installer does not author a whole palette. The configuration screen offers a
+row of vetted **hues** and a **light / base / dark** shade for the chosen one;
+`app.js` **derives** the six chrome/lane tokens from that single colour and posts
+them with the selection to `/api/brand`, which stores both and serves the theme
+back. A custom hex is available for an exact brand match and runs through the
+same derivation.
+
+The derivation is where the legibility guarantee lives: the on-chrome text colour
+(`--color-onchrome`) is chosen from the chrome's brightness, so a **light** shade
+becomes a pale masthead with dark text — never white text on a pale ground — and
+**base**/**dark** shades are darkened until white text clears WCAG 4.5:1. That is
+what lets a customer have their brand colour without anyone producing an
+unreadable console.
+
+> The contrast guarantee currently lives in `app.js` (the only renderer), and the
+> backend stores whatever derived theme it is sent. If a second client is ever
+> added, move the derivation + contrast check server-side so a bad theme cannot
+> be posted directly. The `/api/brand` endpoint should also be behind the
+> configuration password in production.
+
 A **template** for a vertical (Bank, Pharmacy) is then just a theme file plus a
 title and lane labels. There is no layout branch per vertical, so templates do
 not multiply the test matrix.
@@ -353,6 +375,7 @@ for anything omitted, so a partial response never blanks a control.
 | `modules` | array | Add-on modules **fitted**: `{id, name}`, 0–2 |
 | `layout` | string | Control position: `left`, `right` or `bottom` |
 | `theme` | object | Colour tokens, applied at runtime |
+| `brand` | object | `{base, shade}` — the chosen hue and `light`/`base`/`dark`, so the picker shows what is applied |
 | `user_mgmt` | bool | Reserved; `false` in v1 |
 | `hardware` | bool | False when running without a gpiochip |
 | `message` | string | Status line text |
@@ -386,6 +409,7 @@ Commands, all `POST` with a JSON body, all returning `{"ok": true}`:
 | `/api/lanes` | `{"count": 6}` | Shrinking below the held lane releases it |
 | `/api/lane-config` | `{"lane": 2, "label": …, "tag": …, "out_volume": …}` | Each field independent |
 | `/api/title` | `{"text": "Main Branch"}` | |
+| `/api/brand` | `{"base": "#1F5FB0", "shade": "light", "theme": {…}}` | Stores the choice and the UI-derived palette. `400` on a bad shade or a `theme` that is not a JSON object |
 | `/api/auth` | `{"scope": "config", "password": "…"}` | `403` on a wrong password. Scope is `config` or `developer` |
 
 No command except `/api/lane`, `/api/lane-config` and `/api/sim` carries a lane

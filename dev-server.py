@@ -55,6 +55,9 @@ state = {
     "layout": "right",
     "audio_out": "speaker",
     "message": "No lane selected",
+    # Brand colour the installer chose. The derived palette lives in `theme`;
+    # this is kept only so the config picker can show what is selected.
+    "brand": {"base": "", "shade": "base"},
 }
 
 # Optional add-on modules. The UI only draws buttons for what is present, so
@@ -179,6 +182,7 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             payload["hardware"] = False
             payload["modules"] = modules
             payload["theme"] = theme
+            payload["brand"] = state["brand"]
             payload["user_mgmt"] = False   # out of v1; the UI reserves the slot
             return self.send_json(payload)
 
@@ -282,6 +286,25 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/title":
             state["title"] = str(body.get("text", ""))[:32]
+            return self.send_json({"ok": True})
+
+        if path == "/api/brand":
+            # The UI derives the palette (with the legibility guarantee) and
+            # sends it; the backend stores the selection and serves the theme
+            # back. The C backend behaves the same way. In production this
+            # endpoint belongs behind the configuration password.
+            shade = body.get("shade", "base")
+            if shade not in ("light", "base", "dark"):
+                return self.send_json({"error": "bad shade"}, status=400)
+            supplied = body.get("theme")
+            if not isinstance(supplied, dict):
+                return self.send_json({"error": "bad theme"}, status=400)
+
+            theme.clear()
+            theme.update(supplied)
+            state["brand"] = {"base": str(body.get("base", "")), "shade": shade}
+            log("info", "Brand colour set to %s %s"
+                % (state["brand"]["base"] or "default", shade))
             return self.send_json({"ok": True})
 
         if path == "/api/auth":

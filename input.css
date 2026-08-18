@@ -29,6 +29,11 @@
   --color-navy-d:     #1B1A3E;
   --color-navy-tint:  #B9B7E8;
 
+  /* Text and icons ON the masthead. White by default because the default
+     chrome is dark navy; a LIGHT brand shade flips this to a dark ink so the
+     title stays readable. The brand picker derives it from the chrome. */
+  --color-onchrome:   #FFFFFF;
+
   --color-bg:         #EDEFF5;
   --color-surface:    #FFFFFF;
   --color-alt:        #F5F6FA;

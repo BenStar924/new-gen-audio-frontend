@@ -119,6 +119,31 @@ static bool json_str(const char *body, const char *key, char *out, size_t cap)
     return true;
 }
 
+/* Extracts a flat JSON object value — {"a":"b",...} with no nesting, which is
+ * all the derived theme ever is. Copies from the opening brace through the
+ * first closing brace. */
+static bool json_object(const char *body, const char *key, char *out, size_t cap)
+{
+    const char *p = json_find(body, key);
+    if (!p || *p != '{') {
+        return false;
+    }
+
+    const char *end = strchr(p, '}');
+    if (!end) {
+        return false;
+    }
+
+    size_t len = (size_t)(end - p) + 1;
+    if (len >= cap) {
+        return false;
+    }
+
+    memcpy(out, p, len);
+    out[len] = '\0';
+    return true;
+}
+
 /* ---------------- tiny JSON writer ----------------
  *
  * Lane labels, the screen title and log lines all reach us from the on-screen
@@ -313,6 +338,12 @@ static mhd_result_t handle_status(struct MHD_Connection *conn)
      * stylesheet's compiled defaults in place. */
     sb_add(&sb, ",\"theme\":%s", s->theme[0] ? s->theme : "{}");
 
+    /* The brand selection, so the config picker can show what is applied. */
+    json_escape(esc, sizeof(esc), s->brand_base);
+    sb_add(&sb, ",\"brand\":{\"base\":\"%s\"", esc);
+    json_escape(esc, sizeof(esc), s->brand_shade[0] ? s->brand_shade : "base");
+    sb_add(&sb, ",\"shade\":\"%s\"}", esc);
+
     /* User management is designed for but not in v1. */
     sb_add(&sb, ",\"user_mgmt\":false");
 
@@ -489,6 +520,21 @@ static mhd_result_t handle_command(struct MHD_Connection *conn, const char *url,
               console_set_title(text) == 0)
                  ? send_ok(conn)
                  : send_error(conn, MHD_HTTP_BAD_REQUEST, "bad title");
+
+    } else if (strcmp(url, "/api/brand") == 0) {
+        /* The UI derives the palette (with the legibility guarantee) and sends
+         * it; the device stores the choice and serves the theme back. In
+         * production this belongs behind the configuration password. */
+        char base[8], shade[8];
+        char theme[CONSOLE_THEME_MAX];
+        base[0] = '\0';
+        json_str(body, "base", base, sizeof(base));   /* optional */
+
+        rc = (json_str(body, "shade", shade, sizeof(shade)) &&
+              json_object(body, "theme", theme, sizeof(theme)) &&
+              console_set_brand(base, shade, theme) == 0)
+                 ? send_ok(conn)
+                 : send_error(conn, MHD_HTTP_BAD_REQUEST, "bad brand");
 
     } else if (strcmp(url, "/api/auth") == 0) {
         /* Passwords are compared here and never leave the device. The UI is

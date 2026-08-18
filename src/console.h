@@ -96,6 +96,8 @@ typedef struct {
 
     console_layout_t layout;
     char             theme[CONSOLE_THEME_MAX];
+    char             brand_base[8];         /* chosen hue "#RRGGBB", or empty */
+    char             brand_shade[8];        /* light | base | dark */
     char             message[128];
 
     log_entry_t      logs[CONSOLE_LOG_MAX];
@@ -143,6 +145,14 @@ int  console_config_save(const char *path);
 /* Reads a theme file into state->theme, to be served verbatim. Rejects anything
  * that is not a flat JSON object so a bad file cannot corrupt /api/status. */
 int  console_theme_load(const char *path);
+
+/* Stores a theme (a flat JSON object of colour tokens) and persists it. The UI
+ * derives the palette with the legibility guarantee and sends it here; the
+ * device stores and serves it. Rejects anything that is not a JSON object. */
+int  console_set_theme(const char *json);
+
+/* Records the installer's brand choice and its derived theme together. */
+int  console_set_brand(const char *base, const char *shade, const char *theme_json);
 
 const char *console_layout_name(console_layout_t layout);
 bool        console_layout_parse(const char *name, console_layout_t *out);

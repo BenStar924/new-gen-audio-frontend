@@ -18,6 +18,95 @@
  * POSTs — and the once-a-second poll reconciles.
  */
 
+/* ---------- brand colour derivation ----------
+ *
+ * The installer picks a hue and a shade; the console derives the whole palette
+ * from it and — crucially — chooses the on-chrome text colour so labels are
+ * never unreadable. That is what lets a customer have their brand colour
+ * WITHOUT anyone producing an illegible screen: legibility is guaranteed by
+ * construction, not by trusting whoever picked the colour.
+ *
+ * A light shade becomes a pale masthead with dark text and a strong active
+ * lane; base and dark shades are darkened until white text clears WCAG 4.5:1. */
+
+function hexToRgb(hex) {
+  if (typeof hex !== "string") return null;
+  var m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  var n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(rgb) {
+  return "#" + rgb.map(function (c) {
+    var v = Math.max(0, Math.min(255, Math.round(c))).toString(16);
+    return v.length === 1 ? "0" + v : v;
+  }).join("");
+}
+
+function relLum(rgb) {
+  var a = rgb.map(function (c) {
+    c /= 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+}
+
+function contrast(a, b) {
+  var la = relLum(a), lb = relLum(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+function mix(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+var BRAND_WHITE = [255, 255, 255], BRAND_BLACK = [0, 0, 0];
+
+/* Darken a colour until white text on it reaches 4.5:1. */
+function darkenForWhite(rgb) {
+  var r = rgb, guard = 0;
+  while (contrast(r, BRAND_WHITE) < 4.5 && guard < 40) { r = mix(r, BRAND_BLACK, 0.06); guard++; }
+  return r;
+}
+
+/* A dark ink for text on a pale chrome. */
+function inkFor(chrome) {
+  var ink = mix(chrome, BRAND_BLACK, 0.82);
+  if (contrast(ink, chrome) < 4.5) ink = [17, 17, 17];
+  return ink;
+}
+
+/* base hex + shade -> the six chrome/lane tokens (everything else stays the
+   default light field). Returns an object keyed WITHOUT the --color- prefix,
+   which applyTheme adds. */
+function deriveBrandTheme(baseHex, shade) {
+  var rgb = hexToRgb(baseHex);
+  if (!rgb) return {};
+
+  var chrome, onDark, self;
+  if (shade === "light") {
+    chrome = mix(rgb, BRAND_WHITE, 0.78);   /* pale wash of the hue */
+    onDark = true;                          /* so text goes dark */
+    self = darkenForWhite(rgb);             /* active lane keeps a strong hue */
+  } else {
+    chrome = darkenForWhite(rgb);
+    if (shade === "dark") chrome = mix(chrome, BRAND_BLACK, 0.28);
+    onDark = false;
+    self = chrome;
+  }
+
+  return {
+    navy: rgbToHex(chrome),
+    "navy-d": rgbToHex(mix(chrome, BRAND_BLACK, 0.35)),
+    "navy-tint": onDark ? rgbToHex(mix(rgb, BRAND_BLACK, 0.2))
+                        : rgbToHex(mix(chrome, BRAND_WHITE, 0.6)),
+    onchrome: onDark ? rgbToHex(inkFor(chrome)) : "#FFFFFF",
+    "lane-self": rgbToHex(self),
+    "lane-self-line": rgbToHex(mix(self, BRAND_BLACK, 0.35)),
+  };
+}
+
 document.addEventListener("alpine:init", function () {
   Alpine.data("operatorConsole", function () {
     return {
@@ -62,6 +151,26 @@ document.addEventListener("alpine:init", function () {
 
       controlsPosition: "right",
       controlsPositions: ["left", "right", "bottom"],
+
+      /* Brand colour. `base` is the chosen hue (empty = Hamilton default),
+         `shade` is light | base | dark. The palette is DERIVED from these, not
+         painted by hand, so it is always legible. Marketing approves the hue
+         set; the shade ramp and the contrast guarantee are the engineering. */
+      brand: { base: "", shade: "base" },
+      brandHue: "",            /* which hue's shade ramp is on screen */
+      hues: [
+        { name: "Navy",     hex: "#2B2A5E" }, { name: "Royal",  hex: "#1A4F9C" },
+        { name: "Sky",      hex: "#0E6FB2" }, { name: "Teal",   hex: "#0E7A88" },
+        { name: "Green",    hex: "#1F8A4C" }, { name: "Forest", hex: "#14562E" },
+        { name: "Burgundy", hex: "#7A1F3D" }, { name: "Red",    hex: "#C0392B" },
+        { name: "Orange",   hex: "#C15A12" }, { name: "Bronze", hex: "#8A6D2A" },
+        { name: "Purple",   hex: "#5B3E9B" }, { name: "Graphite", hex: "#33343A" },
+      ],
+      shades: [
+        { id: "light", label: "Light" },
+        { id: "base",  label: "Base" },
+        { id: "dark",  label: "Dark" },
+      ],
 
       tab: 0,
       message: "Starting…",
@@ -323,6 +432,17 @@ document.addEventListener("alpine:init", function () {
 
         this.applyTheme(data.theme);
 
+        /* The stored brand selection, so the picker shows what is applied.
+           Not overwritten while the keyboard is open, so an in-progress custom
+           entry is not yanked out from under the installer by a poll. */
+        if (data.brand && typeof data.brand === "object" && !this.kb.open) {
+          this.brand = {
+            base: typeof data.brand.base === "string" ? data.brand.base : "",
+            shade: typeof data.brand.shade === "string" ? data.brand.shade : "base",
+          };
+          if (!this.brandHue) this.brandHue = this.brand.base;
+        }
+
         /* Lane count can shrink under us, leaving the tab out of range. */
         if (this.tab >= this.tabCount) this.tab = this.tabCount - 1;
       },
@@ -483,6 +603,69 @@ document.addEventListener("alpine:init", function () {
         });
       },
 
+      /* ---------- brand colour ---------- */
+
+      /* The hue whose shade ramp is shown: the last one tapped, else the
+         applied brand, else Hamilton navy. */
+      get activeHue() {
+        return this.brandHue || this.brand.base || this.hues[0].hex;
+      },
+
+      isHue: function (hex) {
+        return this.brand.base.toLowerCase() === hex.toLowerCase();
+      },
+
+      isShade: function (shade) {
+        return this.isHue(this.activeHue) && this.brand.shade === shade;
+      },
+
+      /* The chrome colour a given hue+shade produces — used to paint the ramp
+         swatches so they preview the real result, pale to deep. */
+      shadeSwatch: function (baseHex, shade) {
+        return deriveBrandTheme(baseHex, shade).navy || baseHex;
+      },
+
+      /* The text colour that swatch needs, so the label on it stays readable. */
+      shadeInk: function (baseHex, shade) {
+        return deriveBrandTheme(baseHex, shade).onchrome || "#FFFFFF";
+      },
+
+      /* Tapping a hue applies it, keeping the current shade, and reveals its
+         ramp so the shade can be changed. */
+      pickHue: function (hex) {
+        this.brandHue = hex;
+        this.setBrand(hex, this.brand.shade || "base");
+      },
+
+      /* Derive, apply immediately (so the change is instant), then tell the
+         backend, which stores the selection and the derived palette. */
+      setBrand: function (baseHex, shade) {
+        var theme = deriveBrandTheme(baseHex, shade);
+        if (!Object.keys(theme).length) return;   /* not a colour */
+
+        this.applyTheme(theme);
+        this.brand = { base: baseHex, shade: shade };
+        this.brandHue = baseHex;
+        this.post("/api/brand", { base: baseHex, shade: shade, theme: theme })
+          .catch(function () {});
+      },
+
+      /* Exact brand match: type a hex. The same derivation runs, so a custom
+         colour is as legible as a preset. */
+      customBrand: function () {
+        var self = this;
+        this.promptKeyboard({
+          mode: "hex",
+          label: "Brand colour hex (e.g. 1F5FB0)",
+          value: "",                       /* start fresh; typing 6 chars is quick */
+          commit: function (value) {
+            var hex = "#" + String(value).replace(/[^0-9a-fA-F]/g, "").slice(0, 6);
+            if (!hexToRgb(hex)) { self.say("Enter a 6-digit hex colour"); return; }
+            self.setBrand(hex, self.brand.shade || "base");
+          }
+        });
+      },
+
       /* ---------- on-screen keyboard ---------- */
 
       promptKeyboard: function (options) {
@@ -524,6 +707,14 @@ document.addEventListener("alpine:init", function () {
       kbRows: function () {
         if (this.kb.mode === "number") {
           return [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["0"]];
+        }
+        if (this.kb.mode === "hex") {
+          /* A colour needs digits AND A–F; neither of the other layouts has
+             both. */
+          return [
+            ["0", "1", "2", "3", "4", "5", "6", "7"],
+            ["8", "9", "A", "B", "C", "D", "E", "F"]
+          ];
         }
         return [
           ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],

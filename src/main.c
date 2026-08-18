@@ -438,6 +438,46 @@ static int add_module(const char *spec)
 
 /* ---------------- config persistence ---------------- */
 
+/* Validates a candidate theme and copies it into g_state.theme. It is pasted
+ * verbatim into /api/status, so it must be a JSON object and nothing else — a
+ * stray control character or a truncated value would break every poll, not just
+ * the colours. Trims surrounding whitespace and neutralises control bytes. */
+static int store_theme(const char *src, size_t n)
+{
+    size_t start = 0;
+    while (start < n && (unsigned char)src[start] <= ' ') start++;
+    while (n > start && (unsigned char)src[n - 1] <= ' ') n--;
+
+    size_t len = n - start;
+    if (len < 2 || src[start] != '{' || src[n - 1] != '}') return -1;
+    if (len >= sizeof(g_state.theme)) return -1;
+
+    for (size_t i = 0; i < len; i++) {
+        char c = src[start + i];
+        g_state.theme[i] = ((unsigned char)c < 0x20) ? ' ' : c;
+    }
+    g_state.theme[len] = '\0';
+    return 0;
+}
+
+/* Persists the current theme, temp-file-then-rename so a power cut leaves the
+ * previous one intact. An empty theme writes "{}", the "no override" marker. */
+static int write_theme_file(const char *path)
+{
+    char tmp[300];
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+
+    FILE *f = fopen(tmp, "w");
+    if (!f) return -1;
+
+    fputs(g_state.theme[0] ? g_state.theme : "{}", f);
+    fflush(f);
+    fsync(fileno(f));
+    fclose(f);
+
+    return rename(tmp, path);
+}
+
 int console_theme_load(const char *path)
 {
     g_state.theme[0] = '\0';
@@ -445,41 +485,53 @@ int console_theme_load(const char *path)
     FILE *f = fopen(path, "r");
     if (!f) return -1;      /* no theme file: the compiled defaults stand */
 
-    size_t n = fread(g_state.theme, 1, sizeof(g_state.theme) - 1, f);
+    char buf[CONSOLE_THEME_MAX];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
     int too_big = !feof(f);
     fclose(f);
-    g_state.theme[n] = '\0';
+    buf[n] = '\0';
 
     if (too_big) {
-        g_state.theme[0] = '\0';
         console_log("warn", "Theme file larger than %d bytes, ignored",
-                    (int)sizeof(g_state.theme) - 1);
+                    (int)sizeof(buf) - 1);
         return -1;
     }
 
-    /* It is pasted verbatim into /api/status, so it has to be a JSON object and
-     * nothing else. A stray control character or a truncated file would break
-     * every poll, not just the colours. */
-    size_t start = 0;
-    while (start < n && (unsigned char)g_state.theme[start] <= ' ') start++;
-    while (n > start && (unsigned char)g_state.theme[n - 1] <= ' ') n--;
-
-    if (n - start < 2 || g_state.theme[start] != '{' || g_state.theme[n - 1] != '}') {
+    if (store_theme(buf, n) < 0) {
         g_state.theme[0] = '\0';
         console_log("warn", "Theme file is not a JSON object, ignored");
         return -1;
     }
 
-    for (size_t i = start; i < n; i++) {
-        if ((unsigned char)g_state.theme[i] < 0x20) {
-            g_state.theme[i] = ' ';
-        }
+    console_log("info", "Theme loaded (%d bytes)", (int)strlen(g_state.theme));
+    return 0;
+}
+
+int console_set_theme(const char *json)
+{
+    if (!json || store_theme(json, strlen(json)) < 0) return -1;
+    write_theme_file(g_theme_path);
+    return 0;
+}
+
+int console_set_brand(const char *base, const char *shade, const char *theme_json)
+{
+    if (!shade) return -1;
+    if (strcmp(shade, "light") && strcmp(shade, "base") && strcmp(shade, "dark")) {
+        return -1;
     }
 
-    memmove(g_state.theme, g_state.theme + start, n - start);
-    g_state.theme[n - start] = '\0';
+    /* The derived palette must be valid before the choice is recorded — a
+     * refused theme must not leave the brand pointing at nothing. */
+    if (console_set_theme(theme_json) < 0) return -1;
 
-    console_log("info", "Theme loaded (%d bytes)", (int)(n - start));
+    snprintf(g_state.brand_base, sizeof(g_state.brand_base), "%.*s",
+             (int)sizeof(g_state.brand_base) - 1, base ? base : "");
+    snprintf(g_state.brand_shade, sizeof(g_state.brand_shade), "%s", shade);
+
+    console_config_save(g_config_path);
+    console_log("info", "Brand colour set to %s %s",
+                g_state.brand_base[0] ? g_state.brand_base : "default", shade);
     return 0;
 }
 
@@ -521,6 +573,12 @@ int console_config_load(const char *path)
             set_password(g_pw_config, value, "Configuration");
         } else if (strcmp(key, "pw_developer") == 0) {
             set_password(g_pw_developer, value, "Developer");
+        } else if (strcmp(key, "brand_base") == 0) {
+            snprintf(g_state.brand_base, sizeof(g_state.brand_base), "%.*s",
+                     (int)sizeof(g_state.brand_base) - 1, value);
+        } else if (strcmp(key, "brand_shade") == 0) {
+            snprintf(g_state.brand_shade, sizeof(g_state.brand_shade), "%.*s",
+                     (int)sizeof(g_state.brand_shade) - 1, value);
         } else if (strncmp(key, "module", 6) == 0) {
             add_module(value);
         } else if (strncmp(key, "lane", 4) == 0) {
@@ -574,6 +632,9 @@ int console_config_save(const char *path)
     fprintf(f, "brightness=%d\n", g_state.brightness);
     fprintf(f, "title=%s\n",      g_state.title);
     fprintf(f, "audio_out=%s\n",  g_state.audio_out);
+
+    if (g_state.brand_base[0])  fprintf(f, "brand_base=%s\n",  g_state.brand_base);
+    if (g_state.brand_shade[0]) fprintf(f, "brand_shade=%s\n", g_state.brand_shade);
 
     for (int i = 0; i < g_state.module_count; i++) {
         fprintf(f, "module%d=%s:%s\n", i + 1,

@@ -26,7 +26,7 @@
         <path fill="#2B2A5E" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
       </svg>
       <div class="leading-none min-w-0">
-        <h1 class="text-lg font-extrabold tracking-[0.1em] text-white truncate" x-text="title">Operator Console</h1>
+        <h1 class="text-lg font-extrabold tracking-[0.1em] text-onchrome truncate" x-text="title">Operator Console</h1>
         <p class="mt-1 text-[8px] font-bold tracking-[0.22em] text-navy-tint">HAMILTON BY GUNNEBO</p>
       </div>
     </div>
@@ -37,7 +37,7 @@
 
       <!-- Link to the Master Controller, which is a different thing from our
            own backend answering. Both can fail independently. -->
-      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/12 text-[11px] font-extrabold tracking-[0.12em]"
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/10 text-[11px] font-extrabold tracking-[0.12em]"
            :class="connected && online ? 'text-[color:var(--color-on)]' : 'text-[color:var(--color-danger)]'">
         <span class="w-2.5 h-2.5 rounded-full"
               :class="connected && online ? 'bg-on' : 'bg-danger'" aria-hidden="true"></span>
@@ -46,7 +46,7 @@
 
       <button type="button" aria-label="Settings"
               x-on:pointerup.prevent.throttle.250ms="settingsOpen = true"
-              class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl bg-white/12 text-white cursor-pointer">
+              class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl bg-black/10 text-onchrome cursor-pointer">
         <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.7l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.7L4.5 11a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2.1 1.6a.5.5 0 0 0-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6c0 .3.2.5.5.5h4c.3 0 .5-.2.5-.5l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.7L19.4 13ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
         </svg>
@@ -72,7 +72,7 @@
                   class="flex-1 flex items-center justify-center gap-2 px-3 rounded-lg border-2 text-[11px] font-extrabold tracking-[0.1em] cursor-pointer"
                   :style="'min-height:2.75rem'"
                   :class="tab === index - 1
-                            ? 'bg-navy border-navy-d text-white'
+                            ? 'bg-navy border-navy-d text-onchrome'
                             : 'bg-alt border-line text-dim'">
             <span x-text="`${(index - 1) * lanesPerTab + 1}–${Math.min(index * lanesPerTab, lanes.length)}`"></span>
             <span class="w-2.5 h-2.5 rounded-full" aria-hidden="true"
@@ -200,12 +200,12 @@
           <button type="button" aria-label="Audio out speaker" :aria-pressed="audioOut === 'speaker'"
                   x-on:pointerup.prevent.throttle.250ms="setAudioOut('speaker')"
                   class="raised flex-1 flex items-center justify-center min-h-11 min-w-16 px-2 rounded-lg border-2 text-[10px] font-extrabold tracking-[0.08em] cursor-pointer"
-                  :class="audioOut === 'speaker' ? 'bg-navy border-navy-d text-white' : 'bg-alt border-line text-dim'">PANEL</button>
+                  :class="audioOut === 'speaker' ? 'bg-navy border-navy-d text-onchrome' : 'bg-alt border-line text-dim'">PANEL</button>
           <template x-for="module in modules" :key="module.id">
             <button type="button" :aria-label="`Audio out ${module.id}`" :aria-pressed="audioOut === module.id"
                     x-on:pointerup.prevent.throttle.250ms="setAudioOut(module.id)"
                     class="raised flex-1 flex items-center justify-center min-h-11 min-w-16 px-2 rounded-lg border-2 text-[10px] font-extrabold tracking-[0.08em] uppercase cursor-pointer"
-                    :class="audioOut === module.id ? 'bg-navy border-navy-d text-white' : 'bg-alt border-line text-dim'"
+                    :class="audioOut === module.id ? 'bg-navy border-navy-d text-onchrome' : 'bg-alt border-line text-dim'"
                     x-text="module.name"></button>
           </template>
         </div>
@@ -226,8 +226,44 @@
       <h2 class="text-[11px] font-extrabold tracking-[0.14em] uppercase text-dim">Installer configuration</h2>
       <button type="button" aria-label="Close configuration"
               x-on:pointerup.prevent.throttle.250ms="leave()"
-              class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-white text-xs font-extrabold cursor-pointer">DONE</button>
+              class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-onchrome text-xs font-extrabold cursor-pointer">DONE</button>
     </div>
+
+    <!-- Brand colour. Pick a hue, then a shade; the palette is derived so any
+         choice stays legible. The Hamilton mark stays navy regardless. -->
+    <section class="shrink-0 flex flex-col gap-2 p-2.5 bg-surface border-2 border-line rounded-xl">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim">Brand colour</h3>
+          <p class="text-xs text-dim mt-0.5">Pick a hue, then a shade. Any choice stays legible.</p>
+        </div>
+        <button type="button" aria-label="Custom brand hex"
+                x-on:pointerup.prevent.throttle.250ms="customBrand()"
+                class="raised flex items-center justify-center min-h-11 px-3 rounded-lg border-2 border-line bg-alt text-xs font-bold text-ink cursor-pointer shrink-0">Enter hex&hellip;</button>
+      </div>
+
+      <div class="grid grid-cols-12 gap-1.5">
+        <template x-for="hue in hues" :key="hue.hex">
+          <button type="button" :aria-label="`Brand ${hue.name}`"
+                  x-on:pointerup.prevent.throttle.250ms="pickHue(hue.hex)"
+                  class="min-h-11 rounded-md border-2 cursor-pointer"
+                  :style="`background:${hue.hex}`"
+                  :class="isHue(hue.hex) ? 'border-ink' : 'border-transparent'"></button>
+        </template>
+      </div>
+
+      <div class="flex gap-2">
+        <template x-for="sh in shades" :key="sh.id">
+          <button type="button" :aria-label="`${sh.label} shade`"
+                  x-on:pointerup.prevent.throttle.250ms="setBrand(activeHue, sh.id)"
+                  class="relative flex-1 flex items-end justify-center min-h-14 pb-1.5 rounded-lg border-2 cursor-pointer"
+                  :style="`background:${shadeSwatch(activeHue, sh.id)}`"
+                  :class="isShade(sh.id) ? 'border-ink' : 'border-transparent'">
+            <span class="text-[11px] font-extrabold" :style="`color:${shadeInk(activeHue, sh.id)}`" x-text="sh.label"></span>
+          </button>
+        </template>
+      </div>
+    </section>
 
     <div class="flex-1 min-h-0 grid grid-cols-2 gap-2.5">
       <div class="flex flex-col gap-2.5 p-2.5 bg-surface border-2 border-line rounded-xl overflow-y-auto">
@@ -314,7 +350,7 @@
                 class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-line bg-alt text-xs font-extrabold text-ink cursor-pointer">DEVELOPER</button>
         <button type="button" aria-label="Close troubleshooting"
                 x-on:pointerup.prevent.throttle.250ms="leave()"
-                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-white text-xs font-extrabold cursor-pointer">DONE</button>
+                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-onchrome text-xs font-extrabold cursor-pointer">DONE</button>
       </div>
     </div>
 
@@ -341,7 +377,7 @@
       <h2 class="text-[11px] font-extrabold tracking-[0.14em] uppercase text-dim">Developer</h2>
       <button type="button" aria-label="Close developer"
               x-on:pointerup.prevent.throttle.250ms="leave()"
-              class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-white text-xs font-extrabold cursor-pointer">DONE</button>
+              class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-onchrome text-xs font-extrabold cursor-pointer">DONE</button>
     </div>
 
     <div class="flex-1 min-h-0 flex flex-col gap-2.5 p-3 bg-surface border-2 border-line rounded-xl overflow-y-auto">
@@ -384,7 +420,7 @@
             <button type="button" :aria-label="`Controls ${pos}`" :aria-pressed="controlsPosition === pos"
                     x-on:pointerup.prevent.throttle.250ms="setControlsPosition(pos)"
                     class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 text-[11px] font-extrabold uppercase cursor-pointer"
-                    :class="controlsPosition === pos ? 'bg-navy border-navy-d text-white' : 'bg-alt border-line text-dim'"
+                    :class="controlsPosition === pos ? 'bg-navy border-navy-d text-onchrome' : 'bg-alt border-line text-dim'"
                     x-text="pos"></button>
           </template>
         </div>
@@ -416,7 +452,7 @@
 
       <button type="button" aria-label="Close settings"
               x-on:pointerup.prevent.throttle.250ms="settingsOpen = false"
-              class="raised flex items-center justify-center min-h-16 rounded-xl border-2 border-navy-d bg-navy text-white font-bold cursor-pointer">Close</button>
+              class="raised flex items-center justify-center min-h-16 rounded-xl border-2 border-navy-d bg-navy text-onchrome font-bold cursor-pointer">Close</button>
     </div>
   </div>
 
