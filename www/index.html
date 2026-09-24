@@ -3,483 +3,721 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hamilton Operator Console</title>
+  <title>HUBS Audio</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' rx='11' fill='%232B2A5E'/><path d='M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z' fill='%23fff'/></svg>">
   <link rel="stylesheet" href="/vendor/app.css">
   <script defer src="/app.js"></script>
   <script defer src="/vendor/alpine.min.js"></script>
 </head>
 
-<body x-data="operatorConsole" x-cloak class="flex flex-col h-full">
+<!-- One component, every screen. Which <main> shows is `view`, derived from
+     backend state in app.js; see API.md for the contract behind it.
+     Taps bind to pointerup (click is unreliable under WPE) with .throttle as
+     the duplicate-event guard. -->
+<body x-data="hubsConsole" x-cloak class="flex flex-col h-full">
 
-  <!-- Masthead. Logo and title are site-configurable; the palette is a runtime
-       theme, so none of this is locked until Marketing approves. -->
-  <header class="flex items-center justify-between gap-3 px-4 py-2 bg-navy shrink-0">
+  <!-- ============================ MASTHEAD ============================ -->
+  <header class="flex items-center justify-between gap-3 px-3 py-1 bg-navy shrink-0 h-16">
     <div class="flex items-center gap-3 min-w-0">
-      <svg class="w-9 h-9 shrink-0" viewBox="0 0 48 48" aria-hidden="true">
-        <!-- The Hamilton mark is ALWAYS Hamilton navy. It is a brand asset,
-             not chrome, so it is deliberately the one thing on this screen a
-             runtime theme cannot repaint — hence a literal hex rather than a
-             token. It sits on a white plate so it stays legible whatever
-             palette surrounds it. -->
-        <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
-        <path fill="#2B2A5E" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
-      </svg>
+      <!-- The Hamilton mark is ALWAYS Hamilton navy on a white plate: a brand
+           asset, not chrome, so no theme can repaint it (literal hex on
+           purpose). A long press here opens the hidden Developer entry, on the
+           Locked and Troubleshooting screens only. -->
+      <div class="relative shrink-0 w-11 h-11"
+           x-on:pointerdown="logoPressStart()" x-on:pointerup="logoPressEnd()"
+           x-on:pointercancel="logoPressEnd()" x-on:pointerleave="logoPressEnd()">
+        <svg class="w-11 h-11" viewBox="0 0 48 48" aria-hidden="true">
+          <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
+          <path fill="#2B2A5E" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
+        </svg>
+        <!-- Master Console cue. Placeholder look; the final one is open. -->
+        <span x-show="isMaster" aria-label="Master console" data-testid="master-cue"
+              class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-master border-2 border-navy"></span>
+      </div>
       <div class="leading-none min-w-0">
-        <h1 class="text-lg font-extrabold tracking-[0.1em] text-onchrome truncate" x-text="title">Operator Console</h1>
+        <h1 class="text-lg font-extrabold tracking-[0.1em] text-onchrome truncate" x-text="title">HUBS Audio</h1>
         <p class="mt-1 text-[8px] font-bold tracking-[0.22em] text-navy-tint">HAMILTON BY GUNNEBO</p>
       </div>
     </div>
 
-    <div class="flex items-center gap-2.5 shrink-0">
-      <!-- Reserved for the logged-in operator when user management lands. -->
-      <span x-show="userMgmt" class="text-[11px] font-bold text-navy-tint">—</span>
-
-      <!-- Link to the Master Controller, which is a different thing from our
-           own backend answering. Both can fail independently. -->
-      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/10 text-[11px] font-extrabold tracking-[0.12em]"
-           :class="connected && online ? 'text-[color:var(--color-on)]' : 'text-[color:var(--color-danger)]'">
-        <span class="w-2.5 h-2.5 rounded-full"
-              :class="connected && online ? 'bg-on' : 'bg-danger'" aria-hidden="true"></span>
-        <span x-text="!connected ? 'NO BACKEND' : (online ? 'ONLINE' : 'OFFLINE')">CONNECTING</span>
+    <div class="flex items-center gap-2 shrink-0">
+      <!-- Status light: red on any error or failed heartbeat anywhere, yellow
+           on warnings only, green otherwise. Same rule on every screen. -->
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/20" data-testid="status-light"
+           role="status" :aria-label="statusLabel">
+        <span class="status-dot" :class="'status-' + statusLevel" aria-hidden="true"></span>
+        <span class="text-[10px] font-extrabold tracking-[0.12em] uppercase text-onchrome" x-text="statusLabel"></span>
       </div>
 
-      <button type="button" aria-label="Settings"
-              x-on:pointerup.prevent.throttle.250ms="settingsOpen = true"
-              class="flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl bg-black/10 text-onchrome cursor-pointer">
-        <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.7l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.7L4.5 11a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2.1 1.6a.5.5 0 0 0-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6c0 .3.2.5.5.5h4c.3 0 .5-.2.5-.5l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.7L19.4 13ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
-        </svg>
-      </button>
+      <div x-show="user && !locked" class="flex flex-col items-end leading-tight px-2 max-w-[10rem]" data-testid="user-chip">
+        <span class="text-xs font-bold text-onchrome truncate max-w-full" x-text="user && user.name"></span>
+        <span class="text-[9px] font-bold tracking-[0.12em] uppercase text-navy-tint"
+              x-text="user && roleLabels[user.role]"></span>
+      </div>
+
+      <template x-if="view === 'main'">
+        <div class="flex items-center gap-2">
+          <button type="button" class="btn btn-chrome min-h-14 w-14 px-0" aria-label="Troubleshooting"
+                  x-show="can('troubleshooting')"
+                  x-on:pointerup.prevent.throttle.250ms="go('troubleshooting')">
+            <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22.7 19 13.6 9.9c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4Z"/>
+            </svg>
+          </button>
+          <button type="button" class="btn btn-chrome min-h-14 w-14 px-0" aria-label="Settings"
+                  x-show="can('settings')"
+                  x-on:pointerup.prevent.throttle.250ms="go('settings')">
+            <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.7l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.7L4.5 11a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2.1 1.6a.5.5 0 0 0-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6c0 .3.2.5.5.5h4c.3 0 .5-.2.5-.5l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.7L19.4 13ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
+            </svg>
+          </button>
+        </div>
+      </template>
     </div>
   </header>
 
-  <!-- ============================ MAIN ============================ -->
-  <main x-show="screen === 'main'" class="flex-1 min-h-0 flex gap-2.5 p-2.5"
-        :class="controlsPosition === 'bottom' ? 'flex-col'
-                : controlsPosition === 'left' ? 'flex-row-reverse' : 'flex-row'">
+  <!-- ============================= LOCKED =============================
+       Only when the site requires login. Username (checked against the
+       Master's list as soon as it is entered), then a 4-digit PIN. -->
+  <main x-show="view === 'locked'" data-view="locked" class="flex-1 min-h-0 grid grid-cols-[1fr_22rem] gap-2.5 p-2.5">
+    <section class="card flex flex-col gap-2.5 p-3 min-h-0">
+      <p class="text-2xl font-extrabold text-ink tabular-nums" x-text="clockText"></p>
 
-    <section x-show="lanes.length > 1"
-             class="flex flex-col min-h-0 min-w-0 flex-1 gap-2 p-2.5 bg-surface border-2 border-line rounded-xl">
-      <!-- Tabs appear past six lanes. Each carries the worst state among its
-           lanes, so a live or faulted lane never hides behind a tab. -->
-      <div x-show="tabbed" class="flex gap-2 shrink-0">
-        <template x-for="index in tabCount" :key="index">
-          <button type="button"
-                  :aria-label="`Lane tab ${index}`"
-                  :aria-pressed="tab === index - 1"
-                  x-on:pointerup.prevent.throttle.250ms="tab = index - 1"
-                  class="flex-1 flex items-center justify-center gap-2 px-3 rounded-lg border-2 text-[11px] font-extrabold tracking-[0.1em] cursor-pointer"
-                  :style="'min-height:2.75rem'"
-                  :class="tab === index - 1
-                            ? 'bg-navy border-navy-d text-onchrome'
-                            : 'bg-alt border-line text-dim'">
-            <span x-text="`${(index - 1) * lanesPerTab + 1}–${Math.min(index * lanesPerTab, lanes.length)}`"></span>
-            <span class="w-2.5 h-2.5 rounded-full" aria-hidden="true"
-                  :class="{
-                    'bg-on': tabStatus(index - 1) === 'self',
-                    'bg-danger': tabStatus(index - 1) === 'error',
-                    'bg-lane-busy-line': tabStatus(index - 1) === 'busy',
-                    'bg-warn': tabStatus(index - 1) === 'hold',
-                    'bg-line': tabStatus(index - 1) === 'idle'
-                  }"></span>
-          </button>
-        </template>
-      </div>
-
-      <h2 x-show="!tabbed" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim">Lane</h2>
-
-      <div class="lane-grid flex-1 min-h-0" :style="`--lane-cols: ${laneColumns}`">
-        <template x-for="lane in visibleLanes" :key="lane.id">
-          <button type="button"
-                  :aria-label="`Lane ${lane.id}`"
-                  :aria-pressed="lane.status === 'self'"
-                  x-on:pointerup.prevent.throttle.250ms="selectLane(lane)"
-                  class="lane-btn raised relative flex flex-col items-center justify-center gap-1 min-h-16 px-2.5 py-2 rounded-lg border-2 cursor-pointer overflow-hidden"
-                  :class="laneClass(lane)">
-            <!-- Badges are absolute so they add no layout height. The tile has
-                 to survive 12 lanes in the bottom rail, where every pixel of
-                 intrinsic height pushes the grid past its card and clips. -->
-            <span class="absolute top-1.5 left-1.5 w-3 h-3 rounded-[3px]"
-                  :class="tagClass(lane)" aria-hidden="true"
-                  :title="`Lane colour: ${lane.tag}`"></span>
-
-            <span x-show="lane.status === 'self' && mic && !held"
-                  class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-on text-white text-[8px] font-extrabold tracking-[0.1em]">LIVE</span>
-
-            <span class="text-3xl font-extrabold leading-none" x-text="lane.id"></span>
-
-            <span class="text-[9px] font-extrabold tracking-[0.14em] leading-none truncate max-w-full"
-                  x-text="laneCaption(lane)"></span>
-
-            <!-- Which console holds it. Dropped in the bottom rail, where the
-                 rail plus a tab row leaves no room — the caption above still
-                 says IN USE or PARKED. -->
-            <span x-show="!railMode && (lane.status === 'busy' || lane.status === 'hold')"
-                  class="text-[8px] font-bold leading-none truncate max-w-full opacity-70"
-                  x-text="lane.owner || ''"></span>
-          </button>
-        </template>
-      </div>
-    </section>
-
-    <section class="flex min-h-0 gap-2.5 p-2.5 bg-surface border-2 border-line rounded-xl shrink-0"
-             :class="railMode ? 'w-full flex-row items-stretch'
-                     : lanes.length > 1 ? 'w-80 flex-col' : 'w-full max-w-2xl mx-auto flex-1 flex-col'"
-             aria-labelledby="controls-heading">
-      <h2 id="controls-heading" class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim shrink-0"
-          :class="railMode ? '[writing-mode:vertical-rl] rotate-180 text-center' : ''">
-        <!-- Short form in the rail, ALWAYS. Rotated, this heading's text length
-             is the rail's height, and "No lane selected" is tall enough to
-             squeeze the lane grid until tiles clip. -->
-        <span x-text="railMode
-                        ? (hasLane ? `Lane ${activeLaneId}` : 'No lane')
-                        : (hasLane ? `Lane ${activeLaneId} · Audio` : 'No lane selected')">No lane selected</span>
-      </h2>
-
-      <div class="flex gap-2.5" :class="railMode ? 'flex-row items-stretch flex-1' : 'flex-col'">
-        <div class="flex gap-2.5" :class="railMode ? 'flex-1' : ''">
-          <button type="button" aria-label="Microphone" :aria-pressed="mic" :disabled="!hasLane"
-                  x-on:pointerup.prevent.throttle.250ms="toggleMic()"
-                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-xl border-2 cursor-pointer disabled:opacity-45"
-                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (mic ? 'bg-on border-on-d text-white shadow-[0_4px_0_var(--color-on-d)]' : 'bg-alt border-line text-txt')">
-            <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/>
-              <path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2Z"/>
-            </svg>
-            <span class="text-[13px] font-extrabold tracking-wide" x-text="mic ? 'MIC' : 'MIC'">MIC</span>
-            <span class="text-[10px]" :class="mic ? 'text-white/85' : 'text-dim'" x-text="mic ? 'LIVE' : 'OFF'">OFF</span>
-          </button>
-
-          <button type="button" aria-label="Speakers" :aria-pressed="mute" :disabled="!hasLane"
-                  x-on:pointerup.prevent.throttle.250ms="toggleMute()"
-                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-xl border-2 cursor-pointer disabled:opacity-45"
-                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (!mute ? 'bg-warn border-warn-d text-white shadow-[0_4px_0_var(--color-warn-d)]' : 'bg-alt border-line text-txt')">
-            <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 9v6h4l5 5V4L8 9H4Z"/>
-              <path x-show="!mute" d="M16 7.5a5 5 0 0 1 0 9v-2a3 3 0 0 0 0-5v-2Z"/>
-              <path x-show="mute" d="m21.2 12 2.1-2.1-1.4-1.4-2.1 2.1-2.1-2.1-1.4 1.4 2.1 2.1-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4-2.1-2.1Z"/>
-            </svg>
-            <span class="text-[13px] font-extrabold tracking-wide">SPKR</span>
-            <span class="text-[10px]" :class="!mute ? 'text-white/85' : 'text-dim'" x-text="mute ? 'MUTED' : 'ON'">MUTED</span>
-          </button>
-
-          <!-- Hold parks the lane: audio drops but the lane stays ours until
-               another console takes it. -->
-          <button type="button" aria-label="Hold" :aria-pressed="held" :disabled="!hasLane"
-                  x-on:pointerup.prevent.throttle.250ms="toggleHold()"
-                  class="raised flex-1 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-xl border-2 cursor-pointer disabled:opacity-45"
-                  :class="(railMode ? 'min-h-16 ' : 'min-h-24 ') + (held ? 'bg-lane-hold border-lane-hold-line text-txt shadow-[0_4px_0_var(--color-lane-hold-line)]' : 'bg-alt border-line text-txt')">
-            <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M8 5h3v14H8zM13 5h3v14h-3z"/>
-            </svg>
-            <span class="text-[13px] font-extrabold tracking-wide">HOLD</span>
-            <span class="text-[10px] text-dim" x-text="held ? 'PARKED' : 'OFF'">OFF</span>
-          </button>
-        </div>
-
-        <div class="flex items-center gap-2.5 shrink-0" :class="railMode ? '' : 'justify-between'">
-          <button type="button" aria-label="Volume down" :disabled="volume <= 0"
-                  x-on:pointerup.prevent.throttle.150ms="nudgeVolume(-volumeStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">&minus;</button>
-
-          <div class="flex flex-col items-center leading-none" :class="railMode ? 'w-24' : ''">
-            <span class="text-4xl font-extrabold tabular-nums text-ink" x-text="volume">60</span>
-            <span class="mt-1 text-[10px] font-extrabold tracking-[0.14em] text-dim whitespace-nowrap">VOLUME</span>
+      <!-- Ringing while locked. Answering here needs no PIN only when the
+           site allows it, and gives a restricted call (hang up and volume). -->
+      <template x-if="ringingLanes.length">
+        <div class="flex flex-col gap-2 p-2.5 rounded-xl border-2 border-warn bg-alt">
+          <span class="eyebrow" x-text="ringingLanes.length === 1 ? 'Lane calling' : ringingLanes.length + ' lanes calling'"></span>
+          <div class="flex flex-wrap gap-2" x-show="features.answer_without_pin">
+            <template x-for="lane in ringingLanes" :key="lane.id">
+              <button type="button" class="btn btn-go" :style="laneVars(lane)"
+                      :aria-label="'Answer lane ' + lane.number"
+                      x-on:pointerup.prevent.throttle.250ms="tapLane(lane)">
+                <span class="led led-fast w-6 h-6 border-2" aria-hidden="true"></span>
+                <span x-text="'Answer Lane ' + lane.number"></span>
+              </button>
+            </template>
           </div>
-
-          <button type="button" aria-label="Volume up" :disabled="volume >= 100"
-                  x-on:pointerup.prevent.throttle.150ms="nudgeVolume(volumeStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer shadow-[0_3px_0_var(--color-line)] disabled:opacity-40">+</button>
-        </div>
-
-        <!-- Only rendered for modules the backend says are fitted. -->
-        <!-- Stays a row in the bottom rail: stacking these vertically makes the
-             rail tall enough to squeeze the lane grid until tiles clip. -->
-        <div x-show="modules.length" class="flex gap-2 shrink-0 items-center">
-          <button type="button" aria-label="Audio out speaker" :aria-pressed="audioOut === 'speaker'"
-                  x-on:pointerup.prevent.throttle.250ms="setAudioOut('speaker')"
-                  class="raised flex-1 flex items-center justify-center min-h-11 min-w-16 px-2 rounded-lg border-2 text-[10px] font-extrabold tracking-[0.08em] cursor-pointer"
-                  :class="audioOut === 'speaker' ? 'bg-navy border-navy-d text-onchrome' : 'bg-alt border-line text-dim'">PANEL</button>
-          <template x-for="module in modules" :key="module.id">
-            <button type="button" :aria-label="`Audio out ${module.id}`" :aria-pressed="audioOut === module.id"
-                    x-on:pointerup.prevent.throttle.250ms="setAudioOut(module.id)"
-                    class="raised flex-1 flex items-center justify-center min-h-11 min-w-16 px-2 rounded-lg border-2 text-[10px] font-extrabold tracking-[0.08em] uppercase cursor-pointer"
-                    :class="audioOut === module.id ? 'bg-navy border-navy-d text-onchrome' : 'bg-alt border-line text-dim'"
-                    x-text="module.name"></button>
-          </template>
-        </div>
-      </div>
-
-      <div class="flex gap-[3px] shrink-0" role="img" aria-label="Audio level meter"
-           :class="railMode ? 'flex-col-reverse w-4' : 'h-4'">
-        <template x-for="seg in meterSegments" :key="seg">
-          <span class="flex-1 rounded-sm" :class="meterSegmentClass(seg)"></span>
-        </template>
-      </div>
-    </section>
-  </main>
-
-  <!-- ========================= CONFIGURATION ========================= -->
-  <main x-show="screen === 'config'" class="flex-1 min-h-0 flex flex-col gap-2.5 p-2.5">
-    <div class="flex items-center justify-between gap-3 shrink-0">
-      <h2 class="text-[11px] font-extrabold tracking-[0.14em] uppercase text-dim">Installer configuration</h2>
-      <button type="button" aria-label="Close configuration"
-              x-on:pointerup.prevent.throttle.250ms="leave()"
-              class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-onchrome text-xs font-extrabold cursor-pointer">DONE</button>
-    </div>
-
-    <!-- Brand colour. Pick a hue, then a shade; the palette is derived so any
-         choice stays legible. The Hamilton mark stays navy regardless. -->
-    <section class="shrink-0 flex flex-col gap-2 p-2.5 bg-surface border-2 border-line rounded-xl">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h3 class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim">Brand colour</h3>
-          <p class="text-xs text-dim mt-0.5">Pick a hue, then a shade. Any choice stays legible.</p>
-        </div>
-        <button type="button" aria-label="Custom brand hex"
-                x-on:pointerup.prevent.throttle.250ms="customBrand()"
-                class="raised flex items-center justify-center min-h-11 px-3 rounded-lg border-2 border-line bg-alt text-xs font-bold text-ink cursor-pointer shrink-0">Enter hex&hellip;</button>
-      </div>
-
-      <div class="grid grid-cols-12 gap-1.5">
-        <template x-for="hue in hues" :key="hue.hex">
-          <button type="button" :aria-label="`Brand ${hue.name}`"
-                  x-on:pointerup.prevent.throttle.250ms="pickHue(hue.hex)"
-                  class="min-h-11 rounded-md border-2 cursor-pointer"
-                  :style="`background:${hue.hex}`"
-                  :class="isHue(hue.hex) ? 'border-ink' : 'border-transparent'"></button>
-        </template>
-      </div>
-
-      <div class="flex gap-2">
-        <template x-for="sh in shades" :key="sh.id">
-          <button type="button" :aria-label="`${sh.label} shade`"
-                  x-on:pointerup.prevent.throttle.250ms="setBrand(activeHue, sh.id)"
-                  class="relative flex-1 flex items-end justify-center min-h-14 pb-1.5 rounded-lg border-2 cursor-pointer"
-                  :style="`background:${shadeSwatch(activeHue, sh.id)}`"
-                  :class="isShade(sh.id) ? 'border-ink' : 'border-transparent'">
-            <span class="text-[11px] font-extrabold" :style="`color:${shadeInk(activeHue, sh.id)}`" x-text="sh.label"></span>
-          </button>
-        </template>
-      </div>
-    </section>
-
-    <div class="flex-1 min-h-0 grid grid-cols-2 gap-2.5">
-      <div class="flex flex-col gap-2.5 p-2.5 bg-surface border-2 border-line rounded-xl overflow-y-auto">
-        <div class="flex items-center justify-between gap-3 min-h-16">
-          <div class="flex flex-col">
-            <span class="text-[15px]">Drive-thru lanes</span>
-            <span class="text-xs text-dim" x-text="`${minLanes}–${maxLanes}`"></span>
-          </div>
-          <div class="flex items-center gap-2.5">
-            <button type="button" aria-label="Fewer lanes" :disabled="lanes.length <= minLanes"
-                    x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length - 1)"
-                    class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
-            <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="lanes.length"></span>
-            <button type="button" aria-label="More lanes" :disabled="lanes.length >= maxLanes"
-                    x-on:pointerup.prevent.throttle.150ms="setLaneCount(lanes.length + 1)"
-                    class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between gap-3 min-h-16 border-t-2 border-line pt-2.5">
-          <span class="text-[15px]">Screen title</span>
-          <button type="button" aria-label="Edit title"
-                  x-on:pointerup.prevent.throttle.250ms="editTitle()"
-                  class="raised flex items-center justify-end min-h-16 px-4 rounded-xl border-2 border-line bg-alt max-w-[14rem] cursor-pointer">
-            <span class="truncate text-sm font-bold text-ink" x-text="title"></span>
-          </button>
-        </div>
-
-        <p class="text-xs text-dim leading-relaxed border-t-2 border-line pt-2.5">
-          Logo upload needs a decision — the kiosk has no file manager, so it
-          comes either from a USB stick this screen enumerates or is pushed
-          during install. Size and format limits are enforced by the backend,
-          not by trusting this screen.
-        </p>
-      </div>
-
-      <!-- Per-lane: name, colour tag, and the OUTGOING level heard at that lane.
-           Distinct from the console volume on the main screen, which is what the
-           operator hears. -->
-      <div class="flex flex-col gap-2 p-2.5 bg-surface border-2 border-line rounded-xl overflow-y-auto">
-        <h3 class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim shrink-0">Lanes</h3>
-        <template x-for="lane in lanes" :key="lane.id">
-          <div class="flex items-center gap-2 py-1.5 border-b border-line-d">
-            <span class="w-6 text-center text-lg font-extrabold tabular-nums" x-text="lane.id"></span>
-
-            <button type="button" :aria-label="`Rename lane ${lane.id}`"
-                    x-on:pointerup.prevent.throttle.250ms="editLaneLabel(lane)"
-                    class="flex-1 min-w-0 flex items-center min-h-11 px-2 rounded-lg border-2 border-line bg-alt cursor-pointer">
-                <span class="truncate text-xs font-bold" x-text="lane.label"></span>
-            </button>
-
-            <button type="button" :aria-label="`Colour tag lane ${lane.id}`"
-                    x-on:pointerup.prevent.throttle.250ms="setLaneField(lane, 'tag', ['none','red','blue','green','yellow','purple'][(['none','red','blue','green','yellow','purple'].indexOf(lane.tag) + 1) % 6])"
-                    class="flex items-center justify-center w-11 min-h-11 rounded-lg border-2 border-line bg-alt cursor-pointer">
-              <span class="w-5 h-5 rounded-[3px] border border-line" :class="tagClass(lane)"></span>
-            </button>
-
-            <div class="flex items-center gap-1">
-              <button type="button" :aria-label="`Lane ${lane.id} out down`"
-                      x-on:pointerup.prevent.throttle.150ms="setLaneField(lane, 'out_volume', Math.max(0, lane.out_volume - 5))"
-                      class="flex items-center justify-center w-11 min-h-11 rounded-lg border-2 border-line bg-alt text-xl leading-none text-ink cursor-pointer">&minus;</button>
-              <span class="w-9 text-center text-xs font-extrabold tabular-nums" x-text="lane.out_volume"></span>
-              <button type="button" :aria-label="`Lane ${lane.id} out up`"
-                      x-on:pointerup.prevent.throttle.150ms="setLaneField(lane, 'out_volume', Math.min(100, lane.out_volume + 5))"
-                      class="flex items-center justify-center w-11 min-h-11 rounded-lg border-2 border-line bg-alt text-xl leading-none text-ink cursor-pointer">+</button>
-            </div>
-          </div>
-        </template>
-        <p class="text-[10px] text-dim shrink-0">Outgoing level heard at each lane.</p>
-      </div>
-    </div>
-  </main>
-
-  <!-- ======================== TROUBLESHOOTING ======================== -->
-  <main x-show="screen === 'troubleshooting'" class="flex-1 min-h-0 flex flex-col gap-2.5 p-2.5">
-    <div class="flex items-center justify-between gap-3 shrink-0">
-      <h2 class="text-[11px] font-extrabold tracking-[0.14em] uppercase text-dim">Troubleshooting</h2>
-      <div class="flex gap-2">
-        <button type="button" aria-label="Refresh logs"
-                x-on:pointerup.prevent.throttle.250ms="loadLogs()"
-                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-line bg-alt text-xs font-extrabold text-ink cursor-pointer">REFRESH</button>
-        <button type="button" aria-label="Developer screen"
-                x-on:pointerup.prevent.throttle.250ms="unlock('developer')"
-                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-line bg-alt text-xs font-extrabold text-ink cursor-pointer">DEVELOPER</button>
-        <button type="button" aria-label="Close troubleshooting"
-                x-on:pointerup.prevent.throttle.250ms="leave()"
-                class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-onchrome text-xs font-extrabold cursor-pointer">DONE</button>
-      </div>
-    </div>
-
-    <div class="flex-1 min-h-0 flex flex-col gap-1 p-2.5 bg-surface border-2 border-line rounded-xl overflow-y-auto">
-      <template x-for="(entry, index) in logs" :key="index">
-        <div class="flex items-start gap-2 py-1 border-b border-line-d text-xs">
-          <span class="tabular-nums text-dim shrink-0" x-text="entry.t"></span>
-          <span class="shrink-0 px-1.5 rounded font-extrabold text-[9px] uppercase"
-                :class="{
-                  'bg-danger text-white': entry.level === 'error',
-                  'bg-warn text-white': entry.level === 'warn',
-                  'bg-line-d text-dim': entry.level === 'info'
-                }" x-text="entry.level"></span>
-          <span x-text="entry.text"></span>
+          <p x-show="!features.answer_without_pin" class="text-sm text-dim">Log in to answer.</p>
         </div>
       </template>
-      <p x-show="!logs.length" class="text-xs text-dim">No entries.</p>
-    </div>
-  </main>
 
-  <!-- =========================== DEVELOPER =========================== -->
-  <main x-show="screen === 'developer'" class="flex-1 min-h-0 flex flex-col gap-2.5 p-2.5">
-    <div class="flex items-center justify-between gap-3 shrink-0">
-      <h2 class="text-[11px] font-extrabold tracking-[0.14em] uppercase text-dim">Developer</h2>
-      <button type="button" aria-label="Close developer"
-              x-on:pointerup.prevent.throttle.250ms="leave()"
-              class="raised flex items-center justify-center min-h-11 px-4 rounded-lg border-2 border-navy-d bg-navy text-onchrome text-xs font-extrabold cursor-pointer">DONE</button>
-    </div>
-
-    <div class="flex-1 min-h-0 flex flex-col gap-2.5 p-3 bg-surface border-2 border-line rounded-xl overflow-y-auto">
-      <div class="grid grid-cols-2 gap-2 text-xs">
-        <span class="text-dim">UI version</span><span class="tabular-nums" x-text="uiVersion"></span>
-        <span class="text-dim">API contract</span>
-        <span class="tabular-nums"
-              :class="apiMismatch ? 'text-danger font-bold' : ''"
-              x-text="backendApi === null ? `UI v${apiVersion}, backend not reporting`
-                    : apiMismatch ? `UI v${apiVersion}, backend v${backendApi} — MISMATCH`
-                    : `v${apiVersion}`"></span>
-        <span class="text-dim">Backend</span><span class="tabular-nums" x-text="connected ? backendHost : 'unreachable'"></span>
-        <span class="text-dim">Master Controller</span><span x-text="online ? 'online' : 'offline'"></span>
-        <span class="text-dim">Hardware</span><span x-text="hardware ? 'present' : 'absent'"></span>
-        <span class="text-dim">Lanes / audio out</span><span x-text="`${lanes.length} / ${audioOut}`"></span>
+      <!-- Every lane's light, read-only, so the state of the drive-thru is
+           visible before anyone logs in. -->
+      <div class="flex flex-wrap gap-2.5 mt-auto">
+        <template x-for="lane in lanes" :key="lane.id">
+          <div class="flex flex-col items-center gap-1" :style="laneVars(lane)"
+               :aria-label="ledLabel(lane)" role="img">
+            <span class="led w-9 h-9 border-[3px]" :class="ledClass(lane)"></span>
+            <span class="text-xs font-extrabold tabular-nums text-dim" x-text="lane.number"></span>
+          </div>
+        </template>
       </div>
 
-      <!-- Deliberately not wired. Under Cog there is no window manager, so
-           there is no window to open a terminal into; it needs either a VT
-           switch with privileges or a terminal emulator running alongside the
-           kiosk under cage. Showing a button that silently does nothing would
-           be worse than saying so. -->
-      <div class="border-t-2 border-line pt-2.5">
-        <button type="button" aria-label="Launch terminal" disabled
-                class="flex items-center justify-center min-h-16 px-5 rounded-xl border-2 border-line bg-alt text-sm font-extrabold text-ink opacity-45">LAUNCH TERMINAL</button>
-        <p class="mt-2 text-xs text-dim leading-relaxed">
-          Not wired yet. Cog runs without a window manager, so a terminal needs
-          either a VT switch from the backend (requires privileges) or a
-          terminal emulator started alongside the kiosk under cage. Detailed
-          audio configuration lands here once specified.
-        </p>
-      </div>
-    </div>
-  </main>
+      <button type="button" class="btn btn-sm self-start" aria-label="Restart console software"
+              x-on:pointerup.prevent.throttle.250ms="askReboot()">Restart software</button>
+    </section>
 
-  <!-- ========================= SETTINGS MODAL ========================= -->
-  <div x-show="settingsOpen" class="fixed inset-0 flex items-center justify-center p-3 bg-navy-d/70">
-    <div class="w-[min(32rem,100%)] max-h-full overflow-y-auto flex flex-col gap-2.5 p-4 bg-surface border-2 border-line rounded-xl"
-         role="dialog" aria-modal="true">
-      <h2 class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim">Console settings</h2>
+    <section class="card flex flex-col gap-2 p-3 min-h-0" aria-label="Log in">
+      <span class="eyebrow">Log in</span>
+      <button type="button" class="btn justify-start text-left" aria-label="Enter your name"
+              x-on:pointerup.prevent.throttle.250ms="editUsername()">
+        <span class="truncate" :class="login.username ? 'text-txt' : 'text-mute'"
+              x-text="login.username || 'Tap to enter your name'"></span>
+      </button>
 
-      <div class="flex flex-col gap-2 py-2 border-b-2 border-line">
-        <span class="text-[15px]">Controls on</span>
-        <div class="flex gap-2.5">
-          <template x-for="pos in controlsPositions" :key="pos">
-            <button type="button" :aria-label="`Controls ${pos}`" :aria-pressed="controlsPosition === pos"
-                    x-on:pointerup.prevent.throttle.250ms="setControlsPosition(pos)"
-                    class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 text-[11px] font-extrabold uppercase cursor-pointer"
-                    :class="controlsPosition === pos ? 'bg-navy border-navy-d text-onchrome' : 'bg-alt border-line text-dim'"
-                    x-text="pos"></button>
+      <div class="flex items-center justify-between min-h-6">
+        <div class="flex gap-2.5" aria-label="PIN entered" role="img">
+          <template x-for="i in session.pin_length" :key="i">
+            <span class="w-3.5 h-3.5 rounded-full border-2 border-ink"
+                  :class="i <= login.pin.length ? 'bg-ink' : ''"></span>
           </template>
         </div>
+        <span class="text-xs font-bold truncate"
+              :class="login.error ? 'text-danger' : 'text-dim'"
+              x-text="login.error || (login.checking ? 'Checking…' : (login.valid ? 'Enter your PIN' : ''))"></span>
       </div>
 
-      <div class="flex items-center justify-between gap-3 min-h-16 border-b-2 border-line">
-        <span class="text-[15px]">Display brightness</span>
-        <div class="flex items-center gap-2.5">
-          <button type="button" aria-label="Brightness down" :disabled="brightness <= 10"
-                  x-on:pointerup.prevent.throttle.150ms="nudgeBrightness(-brightnessStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">&minus;</button>
-          <span class="min-w-[3ch] text-center text-xl font-extrabold tabular-nums" x-text="brightness"></span>
-          <button type="button" aria-label="Brightness up" :disabled="brightness >= 100"
-                  x-on:pointerup.prevent.throttle.150ms="nudgeBrightness(brightnessStep)"
-                  class="raised flex items-center justify-center w-16 min-w-16 min-h-16 rounded-xl border-2 border-line bg-alt text-ink text-3xl leading-none cursor-pointer disabled:opacity-40">+</button>
+      <div class="grid grid-cols-3 gap-1.5 flex-1 min-h-0">
+        <template x-for="d in ['1','2','3','4','5','6','7','8','9']" :key="d">
+          <button type="button" class="btn btn-sm text-lg min-h-0 h-full" :disabled="!login.valid"
+                  :aria-label="'PIN ' + d"
+                  x-on:pointerup.prevent.throttle.120ms="pinKey(d)" x-text="d"></button>
+        </template>
+        <span></span>
+        <button type="button" class="btn btn-sm text-lg min-h-0 h-full" :disabled="!login.valid" aria-label="PIN 0"
+                x-on:pointerup.prevent.throttle.120ms="pinKey('0')">0</button>
+        <button type="button" class="btn btn-sm min-h-0 h-full" :disabled="!login.pin.length" aria-label="PIN backspace"
+                x-on:pointerup.prevent.throttle.120ms="pinBack()">⌫</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== MAIN ==============================
+       One tile per lane: its identity (unit graphic in the lane's colour,
+       with its number) above its call-status LED pushbutton. One touch
+       answers a ringing lane or calls an idle or held one. -->
+  <main x-show="view === 'main'" data-view="main" class="flex-1 min-h-0 flex flex-col gap-2 p-2.5">
+    <!-- Held calls are a system-wide reminder: the LED slow-blinks on every
+         console, and this line says for how long. -->
+    <div x-show="heldLanes.length" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-alt border-2 border-warn shrink-0">
+      <span class="eyebrow text-warn-d">On hold</span>
+      <template x-for="lane in heldLanes" :key="lane.id">
+        <span class="text-xs font-bold" x-text="'Lane ' + lane.number + ' · ' + elapsed(lane.call.since)"></span>
+      </template>
+    </div>
+
+    <div class="lane-grid flex-1 min-h-0"
+         :style="'grid-template-columns:repeat(' + laneCols + ',minmax(0,1fr));grid-template-rows:repeat(' + laneRows + ',minmax(0,1fr))'">
+      <template x-for="lane in lanes" :key="lane.id">
+        <button type="button" class="card flex flex-col items-center justify-evenly min-w-0 min-h-0 py-1.5 cursor-pointer"
+                :style="laneVars(lane)" :data-lane="lane.number"
+                :aria-label="ledLabel(lane)"
+                x-on:pointerup.prevent.throttle.250ms="tapLane(lane)">
+          <!-- Identity piece. Placeholder unit graphic; the number and colour
+               are what matter and both come from the lane's settings. -->
+          <svg viewBox="0 0 60 72" aria-hidden="true" :style="'height:' + laneSize.unit + 'px'">
+            <rect x="7" y="3" width="46" height="54" rx="9" style="fill:var(--lane)"/>
+            <rect x="12" y="8" width="36" height="8" rx="4" fill="#000" opacity="0.18"/>
+            <rect x="20" y="57" width="20" height="12" style="fill:var(--lane)" opacity="0.7"/>
+            <text x="30" y="46" text-anchor="middle" font-size="26" font-weight="800"
+                  style="fill:var(--lane-ink)" x-text="lane.number"></text>
+          </svg>
+          <span class="led" :class="ledClass(lane)"
+                :style="'width:' + laneSize.led + 'px;height:' + laneSize.led + 'px'">
+            <span x-show="lane.health === 'error'" class="text-xl font-extrabold">✕</span>
+          </span>
+          <span class="text-[10px] font-extrabold tracking-[0.05em] uppercase tabular-nums leading-none min-h-[10px] text-dim whitespace-nowrap"
+                x-text="lane.health === 'error' ? 'Out of service'
+                        : laneState(lane) === 'ringing' ? 'Ringing ' + elapsed(lane.call.since)
+                        : laneState(lane) === 'held' ? 'Hold ' + elapsed(lane.call.since)
+                        : laneState(lane) === 'busy' ? 'Busy' : ''"></span>
+        </button>
+      </template>
+      <p x-show="!lanes.length" class="text-dim self-center justify-self-center">No lanes are configured on this system.</p>
+    </div>
+  </main>
+
+  <!-- =========================== ACTIVE CALL ===========================
+       The only usable screen during a call. A restricted call (answered from
+       the Locked screen without a PIN) gets hang up and volume only. -->
+  <main x-show="view === 'call'" data-view="call" class="flex-1 min-h-0 flex flex-col gap-2.5 p-2.5">
+    <div class="flex-1 min-h-0 grid grid-cols-[13rem_1fr_11rem] gap-2.5">
+      <section class="card flex flex-col items-center justify-center gap-2 p-2" :style="laneVars(callLane)">
+        <svg viewBox="0 0 60 72" aria-hidden="true" class="h-28">
+          <rect x="7" y="3" width="46" height="54" rx="9" style="fill:var(--lane)"/>
+          <rect x="12" y="8" width="36" height="8" rx="4" fill="#000" opacity="0.18"/>
+          <rect x="20" y="57" width="20" height="12" style="fill:var(--lane)" opacity="0.7"/>
+          <text x="30" y="46" text-anchor="middle" font-size="26" font-weight="800"
+                style="fill:var(--lane-ink)" x-text="callLane && callLane.number"></text>
+        </svg>
+        <p class="text-xl font-extrabold text-ink" x-text="callLane ? 'Lane ' + callLane.number : ''"></p>
+        <p class="text-3xl font-extrabold tabular-nums" data-testid="call-timer" x-text="call && elapsed(call.since)"></p>
+        <p x-show="call && call.restricted" class="text-[11px] text-center text-dim leading-snug">
+          Answered without logging in: volume and hang up only.
+        </p>
+      </section>
+
+      <section class="card flex flex-col gap-2.5 p-2.5 min-h-0" :class="call && call.restricted ? 'justify-center' : ''">
+        <div x-show="call && !call.restricted" class="flex gap-2.5">
+          <button type="button" class="btn flex-1 flex-col gap-0.5 min-h-20" aria-label="Mute microphone"
+                  :aria-pressed="call && call.mic_muted"
+                  :class="call && call.mic_muted ? 'btn-warn' : ''"
+                  x-on:pointerup.prevent.throttle.250ms="toggleMic()">
+            <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/>
+              <path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2Z"/>
+              <path x-show="call && call.mic_muted" d="M3.3 2 2 3.3 20.7 22l1.3-1.3z"/>
+            </svg>
+            <span class="text-sm font-extrabold" x-text="call && call.mic_muted ? 'Mic muted' : 'Mute mic'"></span>
+          </button>
+          <!-- Hold ends this console's audio; the lane slow-blinks on every
+               console until someone calls it back. -->
+          <button type="button" class="btn flex-1 flex-col gap-0.5 min-h-20" aria-label="Hold"
+                  x-on:pointerup.prevent.throttle.250ms="holdCall()">
+            <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM13 5h3v14h-3z"/></svg>
+            <span class="text-sm font-extrabold">Hold</span>
+          </button>
         </div>
+
+        <div class="flex items-center justify-between gap-2.5">
+          <button type="button" class="btn w-20 text-3xl" aria-label="Volume down"
+                  :disabled="!call || call.volume <= 0"
+                  x-on:pointerup.prevent.throttle.150ms="nudgeVolume(-5)">&minus;</button>
+          <div class="flex flex-col items-center leading-none">
+            <span class="text-4xl font-extrabold tabular-nums text-ink" data-testid="volume" x-text="call && call.volume"></span>
+            <span class="eyebrow mt-1">Volume</span>
+          </div>
+          <button type="button" class="btn w-20 text-3xl" aria-label="Volume up"
+                  :disabled="!call || call.volume >= 100"
+                  x-on:pointerup.prevent.throttle.150ms="nudgeVolume(5)">+</button>
+        </div>
+
+        <!-- Output for this call only. Only outputs the backend has detected
+             are listed; with just the built-in speaker there is no choice. -->
+        <div x-show="call && !call.restricted && outputs.length > 1" class="flex flex-col gap-1.5 mt-auto">
+          <span class="eyebrow">Audio out</span>
+          <div class="flex gap-2">
+            <template x-for="o in outputs" :key="o.id">
+              <button type="button" class="btn btn-sm flex-1" :aria-label="'Output ' + o.name"
+                      :aria-pressed="call && call.output === o.id"
+                      :class="call && call.output === o.id ? 'btn-selected' : ''"
+                      x-on:pointerup.prevent.throttle.250ms="setOutput(o.id)" x-text="o.name"></button>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      <button type="button" class="btn btn-danger flex-col gap-1 h-full rounded-2xl" aria-label="Hang up"
+              x-on:pointerup.prevent.throttle.400ms="hangUp()">
+        <svg class="w-12 h-12 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 9c-1.6 0-3.1.3-4.6.8v3.1c0 .4-.2.7-.6.9-1 .5-1.9 1.1-2.6 1.8-.2.2-.4.3-.7.3s-.5-.1-.7-.3L.3 13.1c-.2-.2-.3-.4-.3-.7s.1-.5.3-.7C3.3 8.8 7.4 7 12 7s8.7 1.8 11.7 4.7c.2.2.3.4.3.7s-.1.5-.3.7l-2.5 2.5c-.2.2-.4.3-.7.3s-.5-.1-.7-.3c-.8-.7-1.6-1.3-2.6-1.8-.3-.2-.6-.5-.6-.9V9.8C15.1 9.3 13.6 9 12 9Z"/>
+        </svg>
+        <span class="text-lg font-extrabold">Hang up</span>
+      </button>
+    </div>
+
+    <!-- The rest of the drive-thru, read-only: a lane that starts ringing
+         mid-call is visible without leaving the call. -->
+    <div x-show="otherLanes.length" class="flex items-center gap-3 px-3 py-1.5 card shrink-0">
+      <span class="eyebrow">Other lanes</span>
+      <template x-for="lane in otherLanes" :key="lane.id">
+        <div class="flex items-center gap-1" :style="laneVars(lane)" role="img" :aria-label="ledLabel(lane)">
+          <span class="led w-5 h-5 border-2" :class="ledClass(lane)"></span>
+          <span class="text-xs font-extrabold tabular-nums text-dim" x-text="lane.number"></span>
+        </div>
+      </template>
+    </div>
+  </main>
+
+  <!-- ========================= TROUBLESHOOTING ========================= -->
+  <main x-show="view === 'troubleshooting'" data-view="troubleshooting" class="flex-1 min-h-0 flex flex-col gap-2 p-2.5">
+    <div class="flex items-center gap-2 shrink-0">
+      <h2 class="eyebrow mr-auto text-[11px]">Troubleshooting</h2>
+      <button type="button" class="btn btn-sm" aria-label="Download log"
+              x-on:pointerup.prevent.throttle.250ms="exportLog()">Download log</button>
+      <button type="button" class="btn btn-sm" aria-label="Help"
+              x-on:pointerup.prevent.throttle.250ms="go('help')">Help</button>
+      <button type="button" class="btn btn-sm" aria-label="Restart console software"
+              x-on:pointerup.prevent.throttle.250ms="askReboot()">Restart software</button>
+      <button type="button" class="btn btn-sm btn-primary" aria-label="Close troubleshooting"
+              x-on:pointerup.prevent.throttle.250ms="go('main')">Done</button>
+    </div>
+
+    <!-- A2B chain, Master only: every device in cable order from the Master
+         Controller. The first device in error is outlined, because
+         everything after it may be failing only because of it. -->
+    <section x-show="can('chain_diagram')" class="card p-2 shrink-0" aria-label="A2B chain">
+      <div class="grid grid-cols-9 gap-1.5">
+        <div class="flex flex-col items-center justify-center min-h-14 rounded-lg bg-navy text-onchrome text-center px-1">
+          <span class="text-[9px] font-extrabold tracking-[0.1em] uppercase leading-tight">Master Controller</span>
+        </div>
+        <template x-for="(d, index) in chain" :key="d.id">
+          <button type="button" class="relative flex flex-col items-center justify-center gap-0.5 min-h-14 rounded-lg border-2 cursor-pointer px-1"
+                  :style="d.kind === 'lane' ? laneVars(d) : ''"
+                  :class="(chainSelected === d.id ? 'border-ink bg-line-d ' : 'border-line bg-alt ') + (chainOrigin === d.id ? 'chain-origin' : '')"
+                  :aria-label="deviceName(d) + ', ' + d.health"
+                  :data-chain="d.id"
+                  x-on:pointerup.prevent.throttle.250ms="chainSelected = (chainSelected === d.id ? '' : d.id)">
+            <span class="absolute top-0.5 left-1 text-[8px] font-bold text-mute tabular-nums" x-text="index + 1"></span>
+            <span x-show="d.kind === 'lane'" class="w-4 h-4 rounded-sm" style="background:var(--lane)" aria-hidden="true"></span>
+            <svg x-show="d.kind === 'console'" class="w-4 h-4 fill-ink" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 4h18v12H3zM9 18h6v2H9z"/>
+            </svg>
+            <span class="text-[10px] font-extrabold leading-none truncate max-w-full"
+                  x-text="d.kind === 'lane' ? 'Lane ' + d.number : (d.id === consoleInfo.id ? 'This' : 'Con ' + d.id.replace(/^\D+/, ''))"></span>
+            <span class="status-dot w-2.5 h-2.5 border-0" :class="'status-' + (d.health === 'ok' ? 'ok' : d.health)" aria-hidden="true"></span>
+          </button>
+        </template>
       </div>
+    </section>
 
-      <p x-show="authError" class="text-xs font-bold text-danger" x-text="authError"></p>
+    <div class="flex-1 min-h-0 grid gap-2.5" :class="can('chain_diagram') ? 'grid-cols-2' : 'grid-cols-1'">
+      <!-- This console: the heartbeats it depends on, then its active codes. -->
+      <section class="card flex flex-col gap-1.5 p-2.5 min-h-0 overflow-y-auto" aria-label="This console">
+        <span class="eyebrow" x-text="'This console · ' + (isMaster ? 'Master' : 'Operator')"></span>
+        <div class="grid grid-cols-3 gap-1.5">
+          <template x-for="hb in [['i2c', 'I²C'], ['a2b', 'A2B'], ['master_link', 'Master link']]" :key="hb[0]">
+            <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-alt">
+              <span class="status-dot w-2.5 h-2.5 border-0" :class="consoleInfo[hb[0]] ? 'status-ok' : 'status-error'"></span>
+              <span class="text-xs font-bold" x-text="hb[1]"></span>
+            </div>
+          </template>
+        </div>
+        <template x-for="c in (me ? me.codes : [])" :key="c.code">
+          <div class="flex items-start gap-2 py-1 border-b border-line-d text-xs">
+            <span class="shrink-0 px-1.5 rounded font-extrabold text-[9px] uppercase text-white"
+                  :class="c.severity === 'error' ? 'bg-danger' : 'bg-warn'" x-text="c.severity"></span>
+            <span class="mono shrink-0 font-bold" x-text="c.code"></span>
+            <span x-text="c.text"></span>
+          </div>
+        </template>
+        <p x-show="me && !me.codes.length" class="text-xs text-dim">No active codes on this console.</p>
+      </section>
 
+      <section x-show="can('chain_diagram')" class="card flex flex-col gap-1.5 p-2.5 min-h-0 overflow-y-auto" aria-label="Selected device">
+        <template x-if="!chainSelectedDevice">
+          <p class="text-xs text-dim">Tap a device in the chain for its codes.</p>
+        </template>
+        <template x-if="chainSelectedDevice">
+          <div class="flex flex-col gap-1.5">
+            <span class="eyebrow" x-text="deviceName(chainSelectedDevice)"></span>
+            <template x-for="c in (chainSelectedDevice ? chainSelectedDevice.codes : [])" :key="c.code">
+              <div class="flex items-start gap-2 py-1 border-b border-line-d text-xs">
+                <span class="shrink-0 px-1.5 rounded font-extrabold text-[9px] uppercase text-white"
+                      :class="c.severity === 'error' ? 'bg-danger' : 'bg-warn'" x-text="c.severity"></span>
+                <span class="mono shrink-0 font-bold" x-text="c.code"></span>
+                <span x-text="c.text"></span>
+              </div>
+            </template>
+            <p x-show="chainSelectedDevice && !chainSelectedDevice.codes.length" class="text-xs text-dim">No active codes.</p>
+            <button type="button" class="btn btn-sm self-start mt-1" aria-label="Restart lane audio"
+                    x-show="chainSelectedDevice && chainSelectedDevice.kind === 'lane' && can('restart_lane_audio')"
+                    x-on:pointerup.prevent.throttle.250ms="chainSelectedDevice && restartLaneAudio(chainSelectedDevice)">Restart lane audio</button>
+          </div>
+        </template>
+      </section>
+    </div>
+  </main>
+
+  <!-- ============================== HELP ==============================
+       Manuals as page images: WPE has no PDF viewer. -->
+  <main x-show="view === 'help'" data-view="help" class="flex-1 min-h-0 grid grid-cols-[13rem_1fr] gap-2.5 p-2.5">
+    <section class="card flex flex-col gap-2 p-2.5 min-h-0">
+      <span class="eyebrow">Help</span>
+      <template x-for="doc in help.docs" :key="doc.id">
+        <button type="button" class="btn btn-sm justify-start text-left"
+                :class="help.doc && help.doc.id === doc.id ? 'btn-selected' : ''"
+                x-on:pointerup.prevent.throttle.250ms="openHelp(doc)" x-text="doc.title"></button>
+      </template>
+      <p x-show="!help.docs.length" class="text-xs text-dim">No manuals installed.</p>
+      <button type="button" class="btn btn-sm btn-primary mt-auto" aria-label="Back to troubleshooting"
+              x-on:pointerup.prevent.throttle.250ms="go('troubleshooting')">Back</button>
+    </section>
+    <section class="card flex flex-col gap-2 p-2.5 min-h-0">
+      <div class="flex-1 min-h-0 flex items-center justify-center bg-alt rounded-lg overflow-hidden">
+        <template x-if="help.doc">
+          <img class="max-w-full max-h-full object-contain" :src="help.doc.pages[help.page]"
+               :alt="help.doc.title + ', page ' + (help.page + 1)">
+        </template>
+        <p x-show="!help.doc" class="text-sm text-dim">Choose a manual.</p>
+      </div>
+      <div x-show="help.doc" class="flex items-center justify-between gap-2 shrink-0">
+        <button type="button" class="btn btn-sm" aria-label="Previous page" :disabled="help.page <= 0"
+                x-on:pointerup.prevent.throttle.250ms="help.page--">&lsaquo; Prev</button>
+        <span class="text-xs font-bold tabular-nums"
+              x-text="help.doc ? 'Page ' + (help.page + 1) + ' of ' + help.doc.pages.length : ''"></span>
+        <button type="button" class="btn btn-sm" aria-label="Next page"
+                :disabled="!help.doc || help.page >= help.doc.pages.length - 1"
+                x-on:pointerup.prevent.throttle.250ms="help.page++">Next &rsaquo;</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================ DEVELOPER ============================
+       Behind a password. One destination per visit. -->
+  <main x-show="view === 'developer'" data-view="developer" class="flex-1 min-h-0 flex flex-col gap-2 p-2.5">
+    <div class="flex items-center gap-2 shrink-0">
+      <h2 class="eyebrow mr-auto text-[11px]"
+          x-text="dev.mode === 'applog' ? 'Developer · Application log' : dev.mode === 'terminal' ? 'Developer · Terminal' : 'Developer'"></h2>
+      <span class="text-[11px] text-dim tabular-nums" x-text="'UI ' + uiVersion + ' · API v' + apiVersion + (backendApi !== null ? ' (backend v' + backendApi + ')' : '')"></span>
+      <button type="button" class="btn btn-sm btn-primary" aria-label="Exit developer"
+              x-on:pointerup.prevent.throttle.250ms="exitDeveloper()">Exit</button>
+    </div>
+
+    <div x-show="!dev.mode" class="flex-1 min-h-0 grid grid-cols-2 gap-2.5">
+      <button type="button" class="btn flex-col h-full text-lg" aria-label="Open terminal"
+              x-on:pointerup.prevent.throttle.250ms="chooseDev('terminal')">
+        <span class="mono text-3xl">&gt;_</span><span>Terminal</span>
+      </button>
+      <button type="button" class="btn flex-col h-full text-lg" aria-label="Open application log"
+              x-on:pointerup.prevent.throttle.250ms="chooseDev('applog')">
+        <span class="mono text-3xl">≡</span><span>Application log</span>
+      </button>
+    </div>
+
+    <!-- The kiosk has no window manager, so there is no window to open a
+         terminal into. How this is provided is a backend decision; the UI
+         says so instead of showing a button that does nothing. -->
+    <section x-show="dev.mode === 'terminal'" class="card flex-1 min-h-0 p-3 text-sm text-dim leading-relaxed">
+      <p class="font-bold text-txt">Terminal is provided by the backend.</p>
+      <p class="mt-2">Cog runs full-screen with no window manager, so the UI cannot open a terminal
+        itself. Use SSH from a service laptop, or have the backend switch the display to a
+        text console (VT) for the length of the session.</p>
+    </section>
+
+    <section x-show="dev.mode === 'applog'" class="card flex-1 min-h-0 flex flex-col p-0 overflow-hidden">
+      <div x-ref="applog" class="flex-1 min-h-0 overflow-y-auto p-2 mono text-[11px] leading-snug bg-alt">
+        <template x-for="(e, index) in dev.log" :key="index">
+          <div class="py-0.5 border-b border-line-d">
+            <span class="text-dim" x-text="(e.t || '').replace('T', ' ').slice(0, 19)"></span>
+            <span class="font-bold uppercase" :class="e.level === 'error' ? 'text-danger' : 'text-warn-d'" x-text="e.level"></span>
+            <span x-text="e.message"></span>
+            <span class="text-mute" x-show="e.source" x-text="e.source + ':' + e.line"></span>
+          </div>
+        </template>
+        <p x-show="!dev.log.length" class="text-dim">No application errors logged.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================= SETTINGS =============================
+       Master Console only; changes are sent to every console. -->
+  <main x-show="view === 'settings'" data-view="settings" class="flex-1 min-h-0 grid grid-cols-[10rem_1fr] gap-2.5 p-2.5">
+    <nav class="card flex flex-col gap-1.5 p-2 min-h-0" aria-label="Settings sections">
+      <template x-for="tab in settingsTabs" :key="tab.id">
+        <button type="button" class="btn btn-sm justify-start"
+                :aria-pressed="settingsTab === tab.id"
+                :class="settingsTab === tab.id ? 'btn-selected' : ''"
+                x-on:pointerup.prevent.throttle.250ms="settingsTab = tab.id" x-text="tab.label"></button>
+      </template>
+      <p class="mt-auto text-[10px] text-dim leading-snug" x-text="syncText"></p>
+      <button type="button" class="btn btn-sm btn-primary" aria-label="Close settings"
+              x-on:pointerup.prevent.throttle.250ms="go('main')">Done</button>
+    </nav>
+
+    <section class="card flex flex-col gap-2 p-2.5 min-h-0 overflow-y-auto" x-show="settings">
+      <!-- ---- Lanes: number (1-16, gaps allowed) and LED colour ---- -->
+      <template x-if="settings && settingsTab === 'lanes'">
+        <div class="flex flex-col">
+          <span class="eyebrow mb-1">Lanes · number and colour</span>
+          <template x-for="lane in settings.lanes" :key="lane.id">
+            <div class="flex items-center gap-2.5 py-1 border-b border-line-d" :style="laneVars(lane)">
+              <span class="led led-on w-8 h-8 border-[3px] shrink-0" aria-hidden="true"></span>
+              <span class="mono text-[11px] text-mute w-16 truncate" x-text="lane.id"></span>
+              <button type="button" class="btn btn-sm w-28 justify-between" :aria-label="'Number for ' + lane.id"
+                      x-on:pointerup.prevent.throttle.250ms="editLaneNumber(lane)">
+                <span>Lane</span><span class="text-base tabular-nums" x-text="lane.number"></span>
+              </button>
+              <button type="button" class="btn btn-sm flex-1 justify-start capitalize" :aria-label="'Colour for ' + lane.id"
+                      x-on:pointerup.prevent.throttle.250ms="pickLaneColor(lane)">
+                <span class="w-5 h-5 rounded-sm" style="background:var(--lane)"></span>
+                <span x-text="lane.color"></span>
+              </button>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ---- Consoles: per-console defaults, set centrally ---- -->
+      <template x-if="settings && settingsTab === 'consoles'">
+        <div class="flex flex-col gap-2">
+          <div class="flex flex-wrap gap-1.5">
+            <template x-for="c in settings.consoles" :key="c.id">
+              <button type="button" class="btn btn-sm"
+                      :class="settingsConsole === c.id ? 'btn-selected' : ''"
+                      x-on:pointerup.prevent.throttle.250ms="settingsConsole = c.id"
+                      x-text="'Console ' + c.id.replace(/^\D+/, '') + (c.role === 'master' ? ' · Master' : '') + (c.id === consoleInfo.id ? ' · this' : '')"></button>
+            </template>
+          </div>
+          <template x-if="settingsConsoleObj">
+            <div class="flex flex-col">
+              <div class="flex items-center justify-between gap-3 min-h-16 border-b border-line-d">
+                <span>Default audio out</span>
+                <div class="flex gap-1.5">
+                  <template x-for="o in settingsConsoleObj.outputs" :key="o.id">
+                    <button type="button" class="btn btn-sm"
+                            :class="settingsConsoleObj.default_output === o.id ? 'btn-selected' : ''"
+                            x-on:pointerup.prevent.throttle.250ms="setConsoleDefault('default_output', o.id)" x-text="o.name"></button>
+                  </template>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3 min-h-16 border-b border-line-d">
+                <span>Default call volume</span>
+                <div class="flex items-center gap-2">
+                  <button type="button" class="btn w-16 text-2xl" aria-label="Default volume down"
+                          :disabled="settingsConsoleObj.default_volume <= 0"
+                          x-on:pointerup.prevent.throttle.150ms="setConsoleDefault('default_volume', Math.max(0, settingsConsoleObj.default_volume - 5))">&minus;</button>
+                  <span class="w-10 text-center text-xl font-extrabold tabular-nums" x-text="settingsConsoleObj.default_volume"></span>
+                  <button type="button" class="btn w-16 text-2xl" aria-label="Default volume up"
+                          :disabled="settingsConsoleObj.default_volume >= 100"
+                          x-on:pointerup.prevent.throttle.150ms="setConsoleDefault('default_volume', Math.min(100, settingsConsoleObj.default_volume + 5))">+</button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3 min-h-16">
+                <span>Noise cancellation</span>
+                <button type="button" class="btn btn-sm w-24" aria-label="Noise cancellation"
+                        :aria-pressed="settingsConsoleObj.noise_cancellation"
+                        :class="settingsConsoleObj.noise_cancellation ? 'btn-selected' : ''"
+                        x-on:pointerup.prevent.throttle.250ms="setConsoleDefault('noise_cancellation', !settingsConsoleObj.noise_cancellation)"
+                        x-text="settingsConsoleObj.noise_cancellation ? 'On' : 'Off'"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ---- Users: Admin and Owner only. Never deleted; Disabled instead. ---- -->
+      <template x-if="settings && settingsTab === 'users' && settings.users">
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-1">
+            <span class="eyebrow">Users</span>
+            <button type="button" class="btn btn-sm btn-primary" aria-label="Add user"
+                    x-on:pointerup.prevent.throttle.250ms="addUser()">Add user</button>
+          </div>
+          <template x-for="u in settings.users" :key="u.name">
+            <div class="flex items-center gap-2 py-1 border-b border-line-d" :data-user="u.name">
+              <span class="flex-1 min-w-0 truncate font-bold" :class="u.role === 'disabled' ? 'text-mute line-through' : ''" x-text="u.name"></span>
+              <span class="text-[10px] font-extrabold tracking-[0.1em] uppercase text-dim w-24" x-text="roleLabels[u.role]"></span>
+              <template x-if="!u.builtin">
+                <div class="flex gap-1.5">
+                  <button type="button" class="btn btn-sm" :aria-label="'Change role for ' + u.name"
+                          x-on:pointerup.prevent.throttle.250ms="changeRole(u)">Role</button>
+                  <button type="button" class="btn btn-sm" :aria-label="'Reset PIN for ' + u.name"
+                          x-on:pointerup.prevent.throttle.250ms="resetPin(u)">Reset PIN</button>
+                </div>
+              </template>
+              <span x-show="u.builtin" class="text-[10px] text-dim w-[9.5rem] text-right">Built-in</span>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ---- Site ---- -->
+      <template x-if="settings && settingsTab === 'site'">
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between gap-3 min-h-16 border-b border-line-d">
+            <div class="flex flex-col">
+              <span>Require login</span>
+              <span class="text-xs text-dim">Name and 4-digit PIN on every console</span>
+            </div>
+            <button type="button" class="btn btn-sm w-24" aria-label="Require login"
+                    :aria-pressed="settings.site.login_required"
+                    :class="settings.site.login_required ? 'btn-selected' : ''"
+                    x-on:pointerup.prevent.throttle.250ms="setLoginRequired(!settings.site.login_required)"
+                    x-text="settings.site.login_required ? 'On' : 'Off'"></button>
+          </div>
+          <div class="flex items-center justify-between gap-3 min-h-16" :class="settings.site.login_required ? '' : 'opacity-50'">
+            <div class="flex flex-col">
+              <span>Auto-lock after</span>
+              <span class="text-xs text-dim">Without activity. Never during a call.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" class="btn w-16 text-2xl" aria-label="Auto-lock shorter"
+                      :disabled="settings.site.autolock_minutes <= 15"
+                      x-on:pointerup.prevent.throttle.150ms="nudgeAutolock(-15)">&minus;</button>
+              <span class="w-24 text-center text-base font-extrabold tabular-nums" x-text="autolockText(settings.site.autolock_minutes)"></span>
+              <button type="button" class="btn w-16 text-2xl" aria-label="Auto-lock longer"
+                      :disabled="settings.site.autolock_minutes >= 480"
+                      x-on:pointerup.prevent.throttle.150ms="nudgeAutolock(15)">+</button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ---- Audio: tier-1 settings are not specified yet ---- -->
+      <template x-if="settings && settingsTab === 'audio'">
+        <div class="flex flex-col gap-1">
+          <span class="eyebrow">Audio</span>
+          <p class="text-sm text-dim" x-show="!settings.tier1.length">No site audio settings yet. They appear here once they are specified.</p>
+        </div>
+      </template>
+
+      <!-- ---- Backup ---- -->
+      <template x-if="settings && settingsTab === 'backup'">
+        <div class="flex flex-col gap-2.5">
+          <span class="eyebrow">Configuration backup</span>
+          <p class="text-sm text-dim">Lanes, console defaults, users and site settings.</p>
+          <div class="flex gap-2.5">
+            <button type="button" class="btn flex-1" aria-label="Save configuration"
+                    x-on:pointerup.prevent.throttle.250ms="saveConfig()">Save configuration</button>
+            <button type="button" class="btn flex-1" aria-label="Restore configuration"
+                    x-on:pointerup.prevent.throttle.250ms="restoreConfig()">Restore saved</button>
+          </div>
+          <p x-show="settingsResult" class="text-sm font-bold text-on" x-text="settingsResult"></p>
+        </div>
+      </template>
+
+      <!-- ---- Branding: a later release, behind features.customer_branding.
+           The Hamilton mark stays navy whatever is chosen. ---- -->
+      <template x-if="settings && settingsTab === 'branding'">
+        <div class="flex flex-col gap-2">
+          <span class="eyebrow">Brand colour</span>
+          <div class="grid grid-cols-6 gap-1.5">
+            <template x-for="hue in brandHues" :key="hue.hex">
+              <button type="button" class="min-h-11 rounded-md border-2 cursor-pointer" :aria-label="'Brand ' + hue.name"
+                      :style="'background:' + hue.hex"
+                      :class="branding.brand && branding.brand.base === hue.hex ? 'border-ink' : 'border-transparent'"
+                      x-on:pointerup.prevent.throttle.250ms="setBrand(hue.hex, (branding.brand && branding.brand.shade) || 'base')"></button>
+            </template>
+          </div>
+          <div class="flex gap-2" x-show="branding.brand && branding.brand.base">
+            <template x-for="sh in brandShades" :key="sh.id">
+              <button type="button" class="flex-1 min-h-12 rounded-lg border-2 cursor-pointer text-xs font-extrabold"
+                      :aria-label="sh.label + ' shade'"
+                      :style="'background:' + shadeSwatch(branding.brand.base, sh.id)"
+                      :class="branding.brand.shade === sh.id ? 'border-ink' : 'border-transparent'"
+                      x-on:pointerup.prevent.throttle.250ms="setBrand(branding.brand.base, sh.id)">
+                <span class="px-1.5 rounded bg-surface text-ink" x-text="sh.label"></span>
+              </button>
+            </template>
+          </div>
+          <div class="flex items-center justify-between gap-3 min-h-16">
+            <span>Screen title</span>
+            <button type="button" class="btn btn-sm max-w-[14rem]" aria-label="Edit title"
+                    x-on:pointerup.prevent.throttle.250ms="editTitle()"><span class="truncate" x-text="title"></span></button>
+          </div>
+        </div>
+      </template>
+    </section>
+  </main>
+
+  <!-- ============================ OVERLAYS ============================ -->
+
+  <!-- Confirm. -->
+  <div x-show="confirmBox.open" class="fixed inset-0 z-30 flex items-center justify-center p-3 bg-navy-d/70">
+    <div class="w-[min(28rem,100%)] card flex flex-col gap-3 p-4" role="alertdialog" aria-modal="true" data-testid="confirm">
+      <h2 class="text-lg font-extrabold text-ink" x-text="confirmBox.title"></h2>
+      <p class="text-sm text-dim" x-text="confirmBox.body"></p>
       <div class="flex gap-2.5">
-        <button type="button" aria-label="Open troubleshooting"
-                x-on:pointerup.prevent.throttle.250ms="go('troubleshooting')"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">Troubleshooting</button>
-        <button type="button" aria-label="Open configuration"
-                x-on:pointerup.prevent.throttle.250ms="unlock('config')"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">Configuration 🔒</button>
+        <button type="button" class="btn flex-1" aria-label="Cancel"
+                x-on:pointerup.prevent.throttle.250ms="confirmBox.open = false">Cancel</button>
+        <button type="button" class="btn flex-1" aria-label="Confirm"
+                :class="confirmBox.danger ? 'btn-danger' : 'btn-primary'"
+                x-on:pointerup.prevent.throttle.250ms="confirmOk()" x-text="confirmBox.okLabel"></button>
       </div>
-
-      <button type="button" aria-label="Close settings"
-              x-on:pointerup.prevent.throttle.250ms="settingsOpen = false"
-              class="raised flex items-center justify-center min-h-16 rounded-xl border-2 border-navy-d bg-navy text-onchrome font-bold cursor-pointer">Close</button>
     </div>
   </div>
 
-  <!-- ====================== ON-SCREEN KEYBOARD ======================
-       No physical keyboard exists on a deployed console, so every entry goes
-       through this. -->
-  <div x-show="kb.open" class="fixed inset-0 flex items-center justify-center p-3 bg-navy-d/80">
-    <div class="w-[min(46rem,100%)] flex flex-col gap-2.5 p-4 bg-surface border-2 border-line rounded-xl"
-         role="dialog" aria-modal="true">
-      <span class="text-[10px] font-extrabold tracking-[0.14em] uppercase text-dim" x-text="kb.label"></span>
-      <div class="min-h-14 px-4 flex items-center rounded-xl border-2 border-line bg-alt text-2xl font-bold tabular-nums truncate"
+  <!-- Picker: a lane colour or a user role. -->
+  <div x-show="picker.open" class="fixed inset-0 z-30 flex items-center justify-center p-3 bg-navy-d/70">
+    <div class="w-[min(44rem,100%)] max-h-full card flex flex-col gap-2.5 p-3" role="dialog" aria-modal="true" data-testid="picker">
+      <h2 class="eyebrow" x-text="picker.title"></h2>
+      <div class="grid gap-1.5" :class="picker.kind === 'color' ? 'grid-cols-4' : 'grid-cols-1'">
+        <template x-for="opt in picker.options" :key="opt.id">
+          <button type="button" class="btn btn-sm justify-start text-left"
+                  :aria-label="opt.label"
+                  :class="picker.value === opt.id ? 'btn-selected' : ''"
+                  :style="picker.kind === 'color' ? laneVars({ color: opt.id }) : ''"
+                  x-on:pointerup.prevent.throttle.250ms="pickerChoose(opt.id)">
+            <span x-show="picker.kind === 'color'" class="w-6 h-6 rounded-sm shrink-0 border border-line" style="background:var(--lane)"></span>
+            <span class="flex flex-col min-w-0 leading-tight">
+              <span class="capitalize" x-text="opt.label"></span>
+              <span x-show="opt.hint" class="text-[9px] font-bold opacity-70 truncate" x-text="opt.hint"></span>
+            </span>
+          </button>
+        </template>
+      </div>
+      <button type="button" class="btn btn-sm" aria-label="Close picker"
+              x-on:pointerup.prevent.throttle.250ms="picker.open = false">Cancel</button>
+    </div>
+  </div>
+
+  <!-- On-screen keyboard. No physical keyboard exists on a deployed console. -->
+  <div x-show="kb.open" class="fixed inset-0 z-40 flex items-center justify-center p-3 bg-navy-d/80">
+    <div class="w-[min(46rem,100%)] card flex flex-col gap-2 p-3" role="dialog" aria-modal="true" data-testid="keyboard">
+      <span class="eyebrow" x-text="kb.label"></span>
+      <div class="min-h-12 px-4 flex items-center rounded-xl border-2 border-line bg-alt text-2xl font-bold tabular-nums truncate"
            aria-live="polite" x-text="kbDisplay"></div>
 
-      <div class="flex flex-col gap-2" :class="kb.mode === 'number' ? 'items-center' : ''">
+      <div class="flex flex-col gap-1.5">
         <template x-for="(row, rowIndex) in kbRows()" :key="rowIndex">
-          <div class="flex gap-2 justify-center">
+          <div class="flex gap-1.5 justify-center">
             <template x-for="key in row" :key="key">
-              <button type="button" :aria-label="`Key ${key === ' ' ? 'space' : key}`"
+              <button type="button" class="btn btn-sm min-h-12 text-lg"
+                      :aria-label="'Key ' + (key === ' ' ? 'space' : key)"
+                      :class="key === ' ' ? 'w-28' : (kb.mode === 'number' || kb.mode === 'pin' ? 'w-20' : 'w-[3.9rem]')"
                       x-on:pointerup.prevent.throttle.120ms="kbKey(key)"
-                      class="raised flex items-center justify-center min-h-14 rounded-lg border-2 border-line bg-alt text-lg font-bold text-ink cursor-pointer"
-                      :class="key === ' ' ? 'w-32' : (kb.mode === 'number' ? 'w-20' : 'w-[3.9rem]')"
                       x-text="key === ' ' ? 'SPACE' : key"></button>
             </template>
           </div>
@@ -487,22 +725,39 @@
       </div>
 
       <div class="flex gap-2.5">
-        <button type="button" aria-label="Backspace"
-                x-on:pointerup.prevent.throttle.120ms="kbBackspace()"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">DELETE</button>
-        <button type="button" aria-label="Cancel entry"
-                x-on:pointerup.prevent.throttle.250ms="kbCancel()"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-line bg-alt font-bold text-ink cursor-pointer">CANCEL</button>
-        <button type="button" aria-label="Accept entry"
-                x-on:pointerup.prevent.throttle.250ms="kbAccept()"
-                class="raised flex-1 flex items-center justify-center min-h-16 rounded-xl border-2 border-on-d bg-on text-white font-bold cursor-pointer">ENTER</button>
+        <button type="button" class="btn flex-1" aria-label="Backspace"
+                x-on:pointerup.prevent.throttle.120ms="kbBackspace()">Delete</button>
+        <button type="button" class="btn flex-1" aria-label="Cancel entry"
+                x-on:pointerup.prevent.throttle.250ms="kbCancel()">Cancel</button>
+        <button type="button" class="btn btn-go flex-1" aria-label="Accept entry"
+                x-on:pointerup.prevent.throttle.250ms="kbAccept()">Enter</button>
       </div>
     </div>
   </div>
 
-  <footer class="flex items-center justify-between gap-3 px-4 py-1.5 bg-navy text-[11px] text-navy-tint shrink-0">
-    <span x-text="statusLine">Starting&hellip;</span>
-    <span class="tabular-nums" x-text="`v${uiVersion}`"></span>
+  <!-- Screensaver after 5 minutes idle. It swallows the waking touch so that
+       touch cannot press whatever is underneath; a ring clears it by itself. -->
+  <div x-show="screensaver" class="fixed inset-0 z-50 flex items-center justify-center bg-black" data-testid="screensaver"
+       x-on:pointerdown.prevent.stop="lastActivity = Date.now()"
+       x-on:pointerup.prevent.stop="wake()">
+    <svg class="w-24 h-24 opacity-60" viewBox="0 0 48 48" aria-hidden="true">
+      <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
+      <path fill="#2B2A5E" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
+    </svg>
+  </div>
+
+  <!-- Software restart in progress. -->
+  <div x-show="view === 'restarting'" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-navy">
+    <svg class="w-20 h-20" viewBox="0 0 48 48" aria-hidden="true">
+      <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
+      <path fill="#2B2A5E" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
+    </svg>
+    <p class="text-onchrome font-bold">Restarting&hellip;</p>
+  </div>
+
+  <footer class="flex items-center justify-between gap-3 px-4 py-1 bg-navy text-[11px] text-navy-tint shrink-0 min-h-6">
+    <span class="truncate" data-testid="status-line" x-text="statusLine">Starting&hellip;</span>
+    <span class="tabular-nums shrink-0" x-text="'v' + uiVersion"></span>
   </footer>
 
 </body>

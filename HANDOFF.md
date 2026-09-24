@@ -1,149 +1,134 @@
-# Operator Console — backend handoff
+# HUBS Audio console — backend handoff
 
-**Front end: UI v0.7.0 · API contract v1.**
+**Front end: UI v1.0.0 · API contract v2.**
 
-The front end is done. This file describes everything the backend has to
-provide for it, in the order to build it, and how to tell when it's finished.
-For deeper background (the lane model, the pin map, the design decisions) see
-[README.md](README.md). You shouldn't need it to get started.
+The front end is done. This file lists what the backend has to provide for it,
+in the order to build it, and how to tell when you're finished. The contract
+itself, field by field, is [API.md](API.md).
 
 ## The boundary
 
 ```
 Cog (fullscreen, tty1)  ──HTTP──▶  127.0.0.1:8000  ──▶  your backend
                                     ├── /            static files from www/
-                                    └── /api/...     JSON, the contract below
+                                    └── /api/...     JSON, see API.md
 ```
 
-One process serves **both** the static UI (`www/`) and the `/api` endpoints on
-the same origin. The UI uses relative URLs such as `/api/status`, so that isn't
-optional. Bind to loopback only (127.0.0.1): the UI is local to the device.
+One process serves **both** the static UI (`www/`) and `/api` on the same
+origin. The UI uses relative URLs, so that isn't optional. Bind to loopback
+only.
 
-`www/` needs no build step on the device. The Tailwind CSS in
-`www/vendor/app.css` is prebuilt and committed, so the four files in `www/` go
-on the device exactly as they are.
+`www/` needs no build step on the device. The CSS is prebuilt, so the files in
+`www/` go on the device exactly as they are.
 
 ## "Done" means the contract test passes
 
 ```sh
-python3 contract-test.py                                   # read-only: safe on any unit
-python3 contract-test.py --bench --config-password <pw>    # bench unit ONLY
+python3 contract-test.py                                  # read-only: safe on any unit
+python3 contract-test.py --bench --dev-password <pw>      # bench system ONLY
+python3 contract-test.py --bench --user "<admin>" --pin <pin>   # when login is required
 ```
 
-`--bench` selects lanes, so on real hardware it **opens the microphone and
-unmutes the amplifier**. Never run it on a console that is in service. It puts
-back every setting it changes.
+`--bench` **places a real call** on an idle lane and changes settings (and puts
+them back). Never run it on a site in service. It never creates users, restores
+a backup, restarts lane audio, or reboots.
 
-Both reference backends pass it today:
-
-| Backend | Result |
-| --- | --- |
-| `dev-server.py` (Python mock) | 134 passed |
-| `src/` (C, libmicrohttpd + libgpiod v2) | 126 passed, 2 skipped: no add-on modules fitted, no Master Controller |
-
-When yours passes, the UI works against it. Treat the test as the interface
-rather than either codebase: the test was what surfaced every place the two
-reference backends disagreed.
+`dev-server.py` passes all of it in every mode: Master and Operator, locked,
+teller and technician sessions, and 15 lanes. When yours passes, the UI works
+against it.
 
 ## Build order
 
-Each step makes more of the UI work. The UI keeps its last value for any field
-the backend leaves out, so you can check each step on the screen as you go.
+Each step makes more of the UI work, and you can watch it happen on the screen.
 
-1. **Serve `www/` as static files** with `Cache-Control: no-store`. The page
-   loads and shows `NO BACKEND`.
-2. **`GET /api/status`** with `"api": 1` and the `lanes` array. The screen
+1. **Serve `www/`** with `Cache-Control: no-store`. The page loads, and the
+   status light is red ("No response from the console backend").
+2. **`GET /api/status`** with `"api": 2`, `console`, and `devices`, and
+   `session.login_required: false` plus the built-in user. The lane grid
    renders.
-3. **`POST /api/lane`**: select and release. The mic and speakers follow the
-   selection.
-4. **`/api/hold`, `/api/mic`, `/api/mute`, `/api/volume`**.
-5. **Configuration screen**: `/api/auth`, `/api/lanes`, `/api/lane-config`,
-   `/api/title`, `/api/brand`.
-6. **`/api/logs`, `/api/audio-out`** (with `modules`), `/api/brightness`,
-   `/api/layout`.
-7. **Master Controller link**: `online`, plus other consoles' lanes as
-   `busy` / `hold` / `error` with `owner`.
+3. **Calls**: `/api/call`, `/hangup`, `/hold`, `/mic`, `/volume`, `/output`.
+   One-touch connect, the Active Call screen, and the LED states.
+4. **Troubleshooting**: `codes` and `health` on devices, the heartbeats in
+   `console`, `/api/logs/export`, `/api/help` with page images,
+   `/api/reboot`, and `/api/lane/restart-audio`.
+5. **Developer**: `/api/auth`, and `POST`/`GET /api/app-log`.
+6. **Settings (Master only)**: `GET /api/settings`, then the `/api/settings/*`,
+   `/api/users*`, and `/api/config/*` commands, plus `status.sync`.
+7. **Login**: `login_required: true`, `/api/login/check`, `/api/login`, and
+   `/api/lock`.
+8. **Master Controller integration**: roles, the other consoles' lanes as
+   `busy`/`held`, and ringing on every console.
 
-The field-by-field tables are in [README.md → API contract](README.md#api-contract).
+## Rules API.md states that are easy to miss
 
-## Rules the field tables can't express
-
-1. **Mute first, always.** Mute the amplifier before moving the mux, and unmute
-   only after the routing has settled. Doing it in any other order puts a click
-   through the speakers.
-2. **A lane tap is a request.** Refuse it with `409` and a readable reason in
-   `error`. The UI shows that reason to the operator.
-3. **`busy`** means another console is talking: refuse. **`hold`** means another
-   console parked the lane: allow. **`error`** means out of service: refuse.
-4. **Open gap:** when *this* console holds a lane it reports `self` plus
-   `"held": true` to itself, but **other** consoles have to see that lane as
-   `hold`. That translation belongs to the Master Controller, and nothing does
-   it yet. Until something does, a lane parked on one console shows as `busy`
-   on the others and can't be picked up.
-5. **No lane held means `mic: false`, `mute: true`, `level: 0`**, which is the
-   boot state. Never keep the selected lane across a restart: a console that
-   comes back from a power cut with its microphone open is a serious problem.
-6. **Status codes:**
-   - `400` for a malformed request: a field that's missing, the wrong type, or
-     out of range. Reject it; never clamp or guess.
-   - `409` for a request that's well-formed but not possible right now.
-   - `403` only for a wrong password.
-   - `404` for an unknown endpoint.
-7. **Passwords never leave the backend.** `/api/auth` answers yes or no and
-   nothing else.
-8. **`theme` is served exactly as stored**, so only ever store a validated,
-   flat JSON object in it.
-9. **`/api/status` is polled every second.** Keep it cheap, and don't block on
-   hardware inside the handler.
-10. **Put `"api": 1` in `/api/status`.** The UI compares it with its own
-    version and shows a warning on screen if they differ.
+1. **The backend enforces every permission.** The UI hides what a user can't
+   use, but a hidden button isn't security. Enforce the capability table in
+   API.md.
+2. **States are from this console's point of view.** A lane in a call on
+   another console is `busy` here and `active` there. Never tell the UI *which*
+   console has it.
+3. **Hold hangs up.** `POST /api/call/hold` ends this console's audio and leaves
+   the lane `held` on every console, until anyone calls it again.
+4. **No call means no audio path.** Boot with nothing routed, and never restore
+   a call across a restart.
+5. **A call suppresses the lock.** Refuse `/api/lock` and `/api/reboot` with
+   `409` while a call is up.
+6. **Don't let login lock everybody out.** Refuse to turn on `login_required`
+   (`409`) until a non-built-in admin or owner account exists.
+7. **Status codes:** `400` malformed (reject; never clamp), `403` not allowed,
+   `404` unknown, `409` not possible right now. Every error body is
+   `{"error": "..."}` and **the UI shows that text to the operator**, so write
+   it for a teller.
+8. **PINs never leave the backend**: store them hashed, and don't put them in
+   `/api/settings`. The same goes for the developer password.
+9. **`/api/status` is polled every second.** Keep it cheap, and never block on
+   hardware inside it.
+10. **The UI uses `now`** for timers and the clock, so send the Master
+    Controller's time.
 
 ## Reference implementations
 
-Start from either of these, or from neither:
-
-- **`dev-server.py`**: the whole contract in about 480 lines of Python, with no
-  hardware. The easiest place to read what each endpoint does.
-- **`src/`**: C11 on libmicrohttpd and libgpiod **v2** (v1's API is
-  incompatible). It covers the pin map, mute-first ordering, and the config and
-  theme persistence. See README → *Building the application*.
+- **`dev-server.py`**: all of API v2 in one Python file, with simulated
+  hardware. It's the easiest place to read what each endpoint does, including
+  every guard and error message.
+- **`src/`** (C, libmicrohttpd + libgpiod v2): implements the **old API v1**.
+  Use it for the hardware side only: pin map, mute-first ordering, atomic
+  config writes, and a traversal-safe static server. See README.
 
 ## Deploying on the device
 
 ```sh
-cmake --install build                          # the reference backend (or install your own)
-sudo ./deploy/install.sh --with-backend-unit   # UI, kiosk, and both systemd units
+sudo ./deploy/install.sh                       # UI + kiosk unit
+sudo ./deploy/install.sh --with-backend-unit   # also the backend unit template
 sudo reboot
 ```
 
-- **`operatorconsole-kiosk.service`** runs Cog fullscreen on tty1, with no login
-  prompt. It waits until something is listening on port 8000, and it does
-  **not** refer to the backend's unit by name, so you can call yours anything.
-- **`operatorconsole.service`** is a template for the reference backend. If you
-  build your own backend, replace its `ExecStart` and keep the rest.
-- **After updating `www/`,** run `install.sh` again. It clears Cog's caches,
-  which would otherwise keep showing the old UI.
+- **`operatorconsole-kiosk.service`** runs Cog fullscreen on tty1 with no login
+  prompt. It waits for port 8000 and doesn't name the backend's unit, so yours
+  can be called anything.
+- **`operatorconsole.service`** is a template. Point its `ExecStart` at your
+  backend.
+- **After updating `www/`,** run `install.sh` again. It clears Cog's caches.
 - To stage files without a device: `./deploy/install.sh --destdir /tmp/stage`.
 
-## Open items you'll run into
+## Open items (need a decision; the UI has a placeholder)
 
-| Item | State | Where |
-| --- | --- | --- |
-| XVF3800 level meter and gain | Stubbed: they return -1. The meter reads 0; volume is stored but not applied | `src/hardware/i2c.c`, `TODO(xvf3800)` |
-| 12 lanes vs. the mux | 2 select lines (GPIO12/16) address 4 lanes, and `hw_select_lane` refuses anything above 4 | `HW_MUX_LANES` in `hw.h`. Needs 4 select lines in hardware |
-| Master Controller link | Not implemented: `online` is false and there's no `busy`/`hold`/`error` from other consoles | Backend |
-| `held` → `hold` for other consoles | See rule 4 | Master Controller |
-| Cog display flags | Not yet confirmed on hardware | `COG_ARGS` in the kiosk unit |
-| Backlight PWM | Writing to sysfs may need root or a udev rule when the unit runs unprivileged | `operatorconsole.service` |
-| Add-on module detection | Read from the config file (`module1=headset:Headset`) until a hardware probe exists | `add_module` in `main.c` |
-| `/api/brand` | Not behind the configuration password; it should be | Backend |
-| Default passwords | `1234` / `9999` are placeholders | Set `pw_config` / `pw_developer` in `/var/lib/operatorconsole/config` |
-| Logo upload | Undecided: a USB stick, or pushed at install | — |
-| UART | The guide gives it to the hardware layer; not implemented | `src/hardware/` |
+| Item | UI today |
+| --- | --- |
+| Full permission matrix | Provisional `CAPABILITIES` table (API.md) |
+| Hamilton's 16 lane LED colours | 16 placeholder colours in `LANE_COLORS` (`app.js`) and `LANE_COLORS` (`dev-server.py`) |
+| Master Console cue on the logo | Small amber dot on the logo plate |
+| Answering from Locked without a PIN | Behind `features.answer_without_pin` (off); gives a restricted call |
+| Manual lock / switch user | Not provided. Auto-lock only |
+| Log export and config backup transport (USB? A2B SPI?) | `409` with a reason when there's nowhere to write |
+| Tier-1 audio settings | Settings → Audio shows "not yet specified" |
+| Terminal on the Developer screen | Explains that the backend must provide it |
+| Timer lengths (idle, auto-lock, developer) | `TIMERS` in `app.js`, inside the stated ranges |
+| Nightly restart / resync | Backend job; not in the UI |
+| Customer branding | Built but behind `features.customer_branding` (off) |
 
 ## Changing the contract
 
-Change `api` in the backend and `apiVersion` in `www/app.js` **together**, and
-update `contract-test.py` and the README tables in the same change. If the two
-sides ever disagree, the UI shows "Backend API vN, this UI needs vM" in its
-status line and "MISMATCH" on the developer screen.
+Change `api` in the backend and `API_VERSION` in `www/app.js` **together**, and
+update API.md and `contract-test.py` in the same change. If the two sides
+disagree, the UI's status line says "Backend API vN, this UI needs vM".

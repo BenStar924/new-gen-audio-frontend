@@ -1,33 +1,130 @@
-/* Operator Console — Alpine component.
+/* HUBS Audio console, UI.
+ *
+ * One Alpine component drives every screen; the screen shown is derived from
+ * backend state (see `view`), never stored separately, so the UI cannot drift
+ * from what the backend says: a call always takes the whole screen, a locked
+ * console always shows the Locked screen.
+ *
+ * Built from the HUBS Audio UI/UX Design KPI. The API it talks to is API.md
+ * (contract v2). Two rules from that document shape this file:
+ *
+ *   - Role gating goes through ONE check. Nothing here says `if master`;
+ *     every screen and control asks can(capability), and the matrix lives in
+ *     CAPABILITIES below.
+ *   - Device status has ONE source. The lane grid, the status light, the A2B
+ *     chain diagram and "this console's errors" all derive from `devices`.
  *
  * Loaded before vendor/alpine.min.js (both deferred, so document order is
  * execution order) and registers the component on alpine:init.
- *
- * State model: audio is console-wide, because the hardware is — one amplifier
- * mute, one microphone enable, one master volume. A lane is a routing
- * destination. Selecting a lane opens the mic and speakers; releasing it closes
- * them.
- *
- * Lane OWNERSHIP is not ours to decide. Multiple consoles compete for lanes and
- * the Master Controller arbitrates, so a tap is a *request*: the UI marks the
- * lane pending and waits for the backend to confirm. It must never paint a lane
- * as won before it has been granted, or a denied grab flashes as success.
- *
- * The backend is the authority for everything else too. Controls other than
- * lane selection are optimistic — a tap updates local state, renders, then
- * POSTs — and the once-a-second poll reconciles.
  */
 
-/* ---------- brand colour derivation ----------
+/* ---------- application error capture ----------
  *
- * The installer picks a hue and a shade; the console derives the whole palette
- * from it and — crucially — chooses the on-chrome text colour so labels are
- * never unreadable. That is what lets a customer have their brand colour
- * WITHOUT anyone producing an illegible screen: legibility is guaranteed by
- * construction, not by trusting whoever picked the colour.
- *
- * A light shade becomes a pale masthead with dark text and a strong active
- * lane; base and dark shades are darkened until white text clears WCAG 4.5:1. */
+ * Feeds the Developer screen's application log. Uncaught errors, unhandled
+ * promise rejections and the app's own console.error / console.warn calls are
+ * batched to the local backend (there is no internet for a cloud tracker).
+ * Failures to send are swallowed silently: reporting them would log another
+ * error, which would try to send, and so on. */
+(function () {
+  var queue = [];
+  var timer = null;
+  var MAX_QUEUE = 50;
+
+  function iso() { return new Date().toISOString(); }
+
+  function push(entry) {
+    if (queue.length >= MAX_QUEUE) return;          /* an error storm must not flood the Pi */
+    entry.t = entry.t || iso();
+    queue.push(entry);
+    if (!timer) timer = setTimeout(flush, 1000);
+  }
+
+  function flush() {
+    timer = null;
+    if (!queue.length) return;
+    var batch = queue.splice(0, queue.length);
+    try {
+      fetch("/api/app-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: batch })
+      }).catch(function () {});
+    } catch (e) { /* nowhere to report it */ }
+  }
+
+  window.addEventListener("error", function (e) {
+    push({ level: "error", message: String(e.message || "Error"), source: e.filename || "",
+           line: e.lineno || 0, column: e.colno || 0, stack: (e.error && e.error.stack) || "" });
+  });
+
+  window.addEventListener("unhandledrejection", function (e) {
+    var r = e.reason;
+    push({ level: "error", message: "Unhandled rejection: " + (r && r.message ? r.message : String(r)),
+           source: "", line: 0, column: 0, stack: (r && r.stack) || "" });
+  });
+
+  ["error", "warn"].forEach(function (level) {
+    var original = console[level];
+    console[level] = function () {
+      try {
+        var text = Array.prototype.map.call(arguments, function (a) {
+          return typeof a === "string" ? a : (a && a.message) || JSON.stringify(a);
+        }).join(" ");
+        push({ level: level, message: text, source: "", line: 0, column: 0,
+               stack: (new Error().stack || "").split("\n").slice(2).join("\n") });
+      } catch (e) { /* never let capture break logging */ }
+      return original.apply(console, arguments);
+    };
+  });
+})();
+
+/* ---------- constants ---------- */
+
+var API_VERSION = 2;
+var BUILTIN_USER = "Hamilton Audio";
+
+/* Every UI-side timer, together. Values marked (open) in the design doc are
+   placeholders inside its stated ranges. */
+var TIMERS = {
+  screensaverMs:          5 * 60 * 1000,   /* fixed */
+  settingsIdleMs:        10 * 60 * 1000,   /* open: 5-20 min */
+  troubleshootingIdleMs: 10 * 60 * 1000,   /* open: 5-20 min */
+  developerIdleMs:        3 * 60 * 1000,   /* open: 2-5 min */
+  longPressMs:            2000,            /* hidden Developer entry */
+  pollMs:                 1000,
+  requestTimeoutMs:       3000,
+  noticeMs:               4000
+};
+
+/* The provisional capability matrix. The design doc defers the full
+   permission matrix, so this is the single place it changes, and the backend
+   must enforce the same table (API.md). `console: null` means any console. */
+var USER_ROLES = ["user", "technician", "admin", "owner"];
+var CAPABILITIES = {
+  troubleshooting:    { console: null,     roles: USER_ROLES },
+  settings:           { console: "master", roles: ["technician", "admin", "owner"] },
+  manage_users:       { console: "master", roles: ["admin", "owner"] },
+  chain_diagram:      { console: "master", roles: USER_ROLES },
+  restart_lane_audio: { console: "master", roles: ["technician", "admin", "owner"] }
+};
+
+var ROLE_LABELS = {
+  user: "Teller", technician: "Technician", admin: "Admin", owner: "Owner", disabled: "Disabled"
+};
+
+/* PLACEHOLDERS for Hamilton's 16 pneumatic lane LED colours, which have not
+   been supplied. A site has at most 16 devices, so every lane can have its own
+   colour. These are identity, not theme: they match physical LEDs and do not
+   follow the runtime palette. */
+var LANE_COLORS = {
+  red: "#E0302A", orange: "#F07A1A", amber: "#F5A300", yellow: "#F2D21B",
+  lime: "#9BD62A", green: "#25A244", teal: "#12A08E", cyan: "#1BC3E0",
+  sky: "#3B9BF0", blue: "#2257D6", indigo: "#4B3FC4", violet: "#7B4BD8",
+  purple: "#9C3FB8", magenta: "#D62F9E", pink: "#F27AB0", white: "#F4F4F4"
+};
+var LANE_COLOR_ORDER = Object.keys(LANE_COLORS);
+
+/* ---------- colour helpers ---------- */
 
 function hexToRgb(hex) {
   if (typeof hex !== "string") return null;
@@ -61,299 +158,400 @@ function mix(a, b, t) {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-var BRAND_WHITE = [255, 255, 255], BRAND_BLACK = [0, 0, 0];
+var WHITE = [255, 255, 255], BLACK = [0, 0, 0], LED_BODY = [29, 31, 38];
 
-/* Darken a colour until white text on it reaches 4.5:1. */
+/* CSS variables for one lane: its colour, a readable ink for the number on
+   it, and the LED at ~10% (dim, "in a call on another console") and unlit.
+   Computed here rather than with color-mix(), which older WPE builds lack. */
+function laneVars(colorId) {
+  var hex = LANE_COLORS[colorId] || LANE_COLORS.white;
+  var rgb = hexToRgb(hex);
+  var ink = contrast(rgb, BLACK) >= contrast(rgb, WHITE) ? "#111111" : "#FFFFFF";
+  return "--lane:" + hex + ";--lane-ink:" + ink +
+         ";--lane-dim:" + rgbToHex(mix(LED_BODY, rgb, 0.22)) +
+         ";--lane-off:" + rgbToHex(mix(LED_BODY, rgb, 0.07));
+}
+
+/* ---- customer branding (later version; behind features.customer_branding) ----
+   Kept so the capability is ready: the installer picks a hue and a shade and
+   the palette is derived with legibility guaranteed. v1 ships Hamilton only. */
+
 function darkenForWhite(rgb) {
   var r = rgb, guard = 0;
-  while (contrast(r, BRAND_WHITE) < 4.5 && guard < 40) { r = mix(r, BRAND_BLACK, 0.06); guard++; }
+  while (contrast(r, WHITE) < 4.5 && guard < 40) { r = mix(r, BLACK, 0.06); guard++; }
   return r;
 }
 
-/* A dark ink for text on a pale chrome. */
 function inkFor(chrome) {
-  var ink = mix(chrome, BRAND_BLACK, 0.82);
+  var ink = mix(chrome, BLACK, 0.82);
   if (contrast(ink, chrome) < 4.5) ink = [17, 17, 17];
   return ink;
 }
 
-/* base hex + shade -> the six chrome/lane tokens (everything else stays the
-   default light field). Returns an object keyed WITHOUT the --color- prefix,
-   which applyTheme adds. */
 function deriveBrandTheme(baseHex, shade) {
   var rgb = hexToRgb(baseHex);
   if (!rgb) return {};
-
   var chrome, onDark, self;
   if (shade === "light") {
-    chrome = mix(rgb, BRAND_WHITE, 0.78);   /* pale wash of the hue */
-    onDark = true;                          /* so text goes dark */
-    self = darkenForWhite(rgb);             /* active lane keeps a strong hue */
+    chrome = mix(rgb, WHITE, 0.78);
+    onDark = true;
+    self = darkenForWhite(rgb);
   } else {
     chrome = darkenForWhite(rgb);
-    if (shade === "dark") chrome = mix(chrome, BRAND_BLACK, 0.28);
+    if (shade === "dark") chrome = mix(chrome, BLACK, 0.28);
     onDark = false;
     self = chrome;
   }
-
   return {
     navy: rgbToHex(chrome),
-    "navy-d": rgbToHex(mix(chrome, BRAND_BLACK, 0.35)),
-    "navy-tint": onDark ? rgbToHex(mix(rgb, BRAND_BLACK, 0.2))
-                        : rgbToHex(mix(chrome, BRAND_WHITE, 0.6)),
+    "navy-d": rgbToHex(mix(chrome, BLACK, 0.35)),
+    "navy-tint": onDark ? rgbToHex(mix(rgb, BLACK, 0.2)) : rgbToHex(mix(chrome, WHITE, 0.6)),
     onchrome: onDark ? rgbToHex(inkFor(chrome)) : "#FFFFFF",
-    "lane-self": rgbToHex(self),
-    "lane-self-line": rgbToHex(mix(self, BRAND_BLACK, 0.35)),
+    ink: rgbToHex(self)
   };
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+/* ---------- the component ---------- */
+
 document.addEventListener("alpine:init", function () {
-  Alpine.data("operatorConsole", function () {
+  Alpine.data("hubsConsole", function () {
     return {
-      uiVersion: "0.7.0",
+      uiVersion: "1.0.0",
+      apiVersion: API_VERSION,
+      backendApi: null,
+      builtinUser: BUILTIN_USER,
+      roleLabels: ROLE_LABELS,
+      laneColorOrder: LANE_COLOR_ORDER,
 
-      /* The /api contract this UI was built against. The backend reports its
-         own in /api/status `api`; when they differ the status line says so,
-         because a front end and backend owned by different people drift, and
-         drift should be loud rather than a button that quietly does nothing.
-         Bump together with the backend's version when the contract changes. */
-      apiVersion: 1,
-      backendApi: null,        /* null until a backend reports one */
+      /* ---- mirrored from GET /api/status ---- */
+      connected: false,
+      consoleInfo: { id: "", role: "operator", i2c: true, a2b: true, master_link: true },
+      devices: [],
+      call: null,
+      outputs: [],
+      session: { user: null, login_required: false, last_user: "", pin_length: 4, autolock_minutes: 150 },
+      sync: { pending: 0, total: 0 },
+      servicePanel: false,
+      features: { answer_without_pin: false, customer_branding: false },
+      branding: { title: "", theme: {}, brand: { base: "", shade: "base" } },
+      message: "",
 
-      themeSig: "",            /* last theme applied, to skip no-op polls */
-      themeKeys: [],           /* token names currently overridden */
+      /* Backend clock: the Master Controller pushes time to every console, so
+         timers and the date use it rather than the browser's own clock. */
+      serverOffset: 0,
+      nowS: Date.now() / 1000,
 
-      pollMs: 1000,
-      requestTimeoutMs: 2000,
-      meterSegments: 24,
-      volumeStep: 5,
-      brightnessStep: 10,
-
-      minLanes: 1,
-      maxLanes: 12,
-      lanesPerTab: 6,
-
-      /* ---------- screens ---------- */
-
-      /* One document, no page loads: a kiosk never navigates, and a reload on
-         this board costs seconds of WPE startup. */
-      screen: "main",
-      unlocked: {},          /* scope -> true, cleared on leaving the screen */
-
-      connected: false,      /* HTTP link to our own backend */
-      online: false,         /* backend's link to the Master Controller */
-      hardware: false,
-
-      title: "Operator Console",
-      lanes: [],
-      activeLaneId: 0,
-      pendingLaneId: 0,      /* requested, not yet granted */
-      held: false,
-
-      mic: false,
-      mute: true,
-      level: 0,
-
-      volume: 60,
-      brightness: 80,
-      audioOut: "speaker",
-      modules: [],
-      userMgmt: false,
-
-      controlsPosition: "right",
-      controlsPositions: ["left", "right", "bottom"],
-
-      /* Brand colour. `base` is the chosen hue (empty = Hamilton default),
-         `shade` is light | base | dark. The palette is DERIVED from these, not
-         painted by hand, so it is always legible. Marketing approves the hue
-         set; the shade ramp and the contrast guarantee are the engineering. */
-      brand: { base: "", shade: "base" },
-      brandHue: "",            /* which hue's shade ramp is on screen */
-      hues: [
-        { name: "Navy",     hex: "#2B2A5E" }, { name: "Royal",  hex: "#1A4F9C" },
-        { name: "Sky",      hex: "#0E6FB2" }, { name: "Teal",   hex: "#0E7A88" },
-        { name: "Green",    hex: "#1F8A4C" }, { name: "Forest", hex: "#14562E" },
-        { name: "Burgundy", hex: "#7A1F3D" }, { name: "Red",    hex: "#C0392B" },
-        { name: "Orange",   hex: "#C15A12" }, { name: "Bronze", hex: "#8A6D2A" },
-        { name: "Purple",   hex: "#5B3E9B" }, { name: "Graphite", hex: "#33343A" },
-      ],
-      shades: [
-        { id: "light", label: "Light" },
-        { id: "base",  label: "Base" },
-        { id: "dark",  label: "Dark" },
-      ],
-
-      tab: 0,
-      message: "Starting…",
-
-      /* A refusal has to survive the next poll. The backend's own message is
-         whatever is true right now ("No lane selected"), so without this a
-         "lane is in use" notice is wiped inside a second and the tap reads as
-         a broken screen — the exact thing saying why was meant to prevent. */
+      /* ---- local UI state ---- */
+      screen: "main",              /* main | settings | troubleshooting | help */
+      pendingLane: "",             /* a tap in flight */
       notice: "",
       noticeUntil: 0,
-      noticeMs: 4000,
+      lastActivity: Date.now(),
+      screensaver: false,
+      restarting: false,
 
-      settingsOpen: false,
-      backendHost: window.location.host,
+      dev: { unlocked: false, mode: null, returnTo: "troubleshooting", log: [] },
+      help: { docs: [], doc: null, page: 0 },
+      login: { username: "", valid: false, pin: "", error: "", checking: false },
+      confirmBox: { open: false, title: "", body: "", okLabel: "", danger: false, action: null },
+      picker: { open: false, title: "", options: [], value: "", commit: null },
+      chainSelected: "",
 
-      /* Screens that need a password, and the prompt state for them. */
-      authScope: null,
-      authError: "",
-      logs: [],
+      settings: null,
+      settingsTab: "lanes",
+      settingsConsole: "",
+      settingsResult: "",
 
-      /* On-screen keyboard. No physical keyboard exists on a deployed console,
-         so every text and number entry goes through this. */
-      kb: { open: false, mode: "number", value: "", label: "", secret: false,
-            commit: null },
+      themeSig: "",
+      themeKeys: [],
+      longPressTimer: null,
 
-      init: function () {
-        this.poll();
-        setInterval(this.poll.bind(this), this.pollMs);
+      kb: { open: false, mode: "number", label: "", value: "", secret: false, commit: null, max: 32 },
+
+      /* ================= derived ================= */
+
+      get user() { return this.session.user; },
+
+      get lanes() {
+        return this.devices
+          .filter(function (d) { return d.kind === "lane"; })
+          .sort(function (a, b) { return a.number - b.number; });
       },
 
-      /* ---------- derived ---------- */
-
-      get hasLane() {
-        return this.activeLaneId >= 1;
+      get chain() {
+        return this.devices.slice().sort(function (a, b) { return a.position - b.position; });
       },
 
-      /* The status line. Re-evaluated on every poll, so an expired notice
-         gives way to the backend's own message within a second. */
-      /* True only when the backend explicitly reports a different contract.
-         A backend that reports nothing is not flagged — the check exists to
-         catch drift, not to reject every older build. */
+      get me() {
+        var id = this.consoleInfo.id;
+        return this.devices.find(function (d) { return d.id === id; }) || null;
+      },
+
+      get isMaster() { return this.consoleInfo.role === "master"; },
+
+      get locked() {
+        return this.session.login_required && !this.session.user;
+      },
+
+      get ringingLanes() {
+        return this.lanes.filter(function (l) { return l.call && l.call.state === "ringing"; });
+      },
+
+      get callLane() {
+        if (!this.call) return null;
+        var id = this.call.lane;
+        return this.devices.find(function (d) { return d.id === id; }) || null;
+      },
+
+      /* What is on screen, in priority order. A call always wins: the design
+         doc makes the in-call screen the only thing usable during a call. */
+      get view() {
+        if (this.restarting) return "restarting";
+        if (this.call) return "call";
+        if (this.dev.unlocked) return "developer";
+        if (this.locked) return "locked";
+        return this.screen;
+      },
+
+      /* The status light, one rule for every screen: red for any error
+         anywhere or a failed heartbeat; yellow for warnings only; else green. */
+      get statusLevel() {
+        var c = this.consoleInfo;
+        if (!this.connected || !c.i2c || !c.a2b || !c.master_link) return "error";
+        var worst = "ok";
+        this.devices.forEach(function (d) {
+          if (d.health === "error") worst = "error";
+          else if (d.health === "warning" && worst !== "error") worst = "warning";
+        });
+        return worst;
+      },
+
+      get statusLabel() {
+        return { ok: "System OK", warning: "Warning", error: "Error" }[this.statusLevel];
+      },
+
       get apiMismatch() {
         return this.backendApi !== null && this.backendApi !== this.apiVersion;
       },
 
       get statusLine() {
-        /* A contract mismatch outranks everything: controls may silently fail
-           to do what they say, and whoever is on the bench needs to know why
-           before they start debugging the wrong thing. */
         if (this.apiMismatch) {
-          return "Backend API v" + this.backendApi + ", this UI needs v" +
-                 this.apiVersion + " — update one side";
+          return "Backend API v" + this.backendApi + ", this UI needs v" + this.apiVersion +
+                 ", so update one side";
         }
+        if (!this.connected) return "No response from the console backend";
         if (this.notice && Date.now() < this.noticeUntil) return this.notice;
         return this.message;
       },
 
-      get tabCount() {
-        return Math.ceil(this.lanes.length / this.lanesPerTab) || 1;
+      get title() {
+        return (this.features.customer_branding && this.branding.title) || "HUBS Audio";
       },
 
-      get tabbed() {
-        return this.lanes.length > this.lanesPerTab;
+      get laneCols() {
+        var n = this.lanes.length;
+        return n <= 8 ? Math.max(n, 1) : Math.ceil(n / 2);
       },
 
-      /* Lanes on the current tab only. */
-      get visibleLanes() {
-        if (!this.tabbed) return this.lanes;
-        var start = this.tab * this.lanesPerTab;
-        return this.lanes.slice(start, start + this.lanesPerTab);
+      get laneRows() { return this.lanes.length <= 8 ? 1 : 2; },
+
+      /* Pixel sizes for the identity graphic and LED button. Fixed steps
+         rather than percentages: the LED must stay round whichever of the
+         tile's width or height is the tighter one. */
+      get laneSize() {
+        if (this.laneRows === 2) return { unit: 60, led: 46 };
+        if (this.laneCols <= 4) return { unit: 132, led: 96 };
+        return { unit: 96, led: 68 };
       },
 
-      /* A lane on another tab can be live, busy or faulted and the operator
-         would never see it. Each tab header carries the worst state among its
-         lanes so nothing hides behind a tab. */
-      tabStatus: function (index) {
-        var start = index * this.lanesPerTab;
-        var lanes = this.lanes.slice(start, start + this.lanesPerTab);
-
-        if (lanes.some(function (l) { return l.status === "self"; }))  return "self";
-        if (lanes.some(function (l) { return l.status === "error"; })) return "error";
-        if (lanes.some(function (l) { return l.status === "busy"; }))  return "busy";
-        if (lanes.some(function (l) { return l.status === "hold"; }))  return "hold";
-        return "idle";
+      get heldLanes() {
+        return this.lanes.filter(function (l) { return l.call && l.call.state === "held"; });
       },
 
-      get laneColumns() {
-        var n = this.visibleLanes.length;
-        var wide = { 1: 1, 2: 2, 3: 3, 4: 2, 5: 3, 6: 3 };
-        var narrow = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 3 };
-
-        var byCount = this.controlsPosition === "bottom" ? wide : narrow;
-        return byCount[n] || Math.ceil(Math.sqrt(n)) || 1;
+      get otherLanes() {
+        var id = this.call && this.call.lane;
+        return this.lanes.filter(function (l) { return l.id !== id; });
       },
 
-      get railMode() {
-        return this.controlsPosition === "bottom" && this.lanes.length > 1;
+      get settingsTabs() {
+        var tabs = [
+          { id: "lanes", label: "Lanes" },
+          { id: "consoles", label: "Consoles" }
+        ];
+        if (this.can("manage_users")) tabs.push({ id: "users", label: "Users" });
+        tabs.push({ id: "site", label: "Site" }, { id: "audio", label: "Audio" },
+                  { id: "backup", label: "Backup" });
+        if (this.features.customer_branding) tabs.push({ id: "branding", label: "Branding" });
+        return tabs;
       },
 
-      /* ---------- lane appearance ----------
-         Every colour is a token so a theme can restyle it without a rebuild.
-         Nothing here may return a literal colour. */
+      get clockText() {
+        var d = new Date(this.nowS * 1000);
+        var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        var h = d.getHours(), ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12 || 12;
+        return days[d.getDay()] + " " + d.getDate() + " " + months[d.getMonth()] +
+               "  ·  " + h + ":" + pad2(d.getMinutes()) + " " + ampm;
+      },
 
-      laneClass: function (lane) {
-        if (lane.id === this.pendingLaneId) {
-          return "bg-lane-idle border-lane-self-line opacity-60";
+      get syncText() {
+        if (!this.sync.total) return "";
+        if (!this.sync.pending) return "All consoles up to date";
+        return "Updating " + this.sync.pending + " of " + this.sync.total + " consoles…";
+      },
+
+      /* ================= role gating: the ONE check ================= */
+
+      can: function (capability) {
+        var rule = CAPABILITIES[capability];
+        var user = this.session.user;
+        if (!rule || !user || user.role === "disabled") return false;
+        if (this.call && this.call.restricted) return false;
+        if (rule.console && rule.console !== this.consoleInfo.role) return false;
+        return rule.roles.indexOf(user.role) !== -1;
+      },
+
+      /* ================= lifecycle ================= */
+
+      init: function () {
+        var self = this;
+        this.poll();
+        setInterval(function () { self.poll(); }, TIMERS.pollMs);
+        setInterval(function () { self.tick(); }, 250);
+
+        /* Any touch is activity; it also dismisses the screensaver (the
+           overlay swallows that touch so it cannot press what is under it). */
+        document.addEventListener("pointerdown", function () {
+          self.lastActivity = Date.now();
+        }, true);
+      },
+
+      tick: function () {
+        this.nowS = Date.now() / 1000 + this.serverOffset;
+        var idle = Date.now() - this.lastActivity;
+        var view = this.view;
+
+        /* An incoming ring always clears the screensaver. */
+        if (this.screensaver && this.ringingLanes.length) this.screensaver = false;
+        if (!this.screensaver && idle > TIMERS.screensaverMs && !this.call &&
+            !this.ringingLanes.length && view !== "developer" && !this.kb.open) {
+          this.screensaver = true;
         }
 
-        switch (lane.status) {
-        case "self":
-          return "bg-lane-self border-lane-self-line text-white shadow-[0_4px_0_var(--color-lane-self-line)]";
-        case "busy":
-          return "bg-lane-busy border-lane-busy-line text-txt lane-locked";
-        case "hold":
-          return "bg-lane-hold border-lane-hold-line text-txt";
-        case "error":
-          return "bg-lane-error border-lane-error-line text-mute lane-locked";
-        default:
-          return "bg-lane-idle border-lane-idle-line text-txt";
+        if ((view === "settings" && idle > TIMERS.settingsIdleMs) ||
+            ((view === "troubleshooting" || view === "help") && idle > TIMERS.troubleshootingIdleMs)) {
+          this.screen = "main";
+        }
+        if (view === "developer" && idle > TIMERS.developerIdleMs) {
+          this.exitDeveloper();
+        }
+
+        /* Auto-lock. Suppressed by an active call: a long quiet call must not
+           time the operator out mid-call. */
+        if (this.session.login_required && this.session.user && !this.call &&
+            idle > this.session.autolock_minutes * 60 * 1000 && !this.lockSent) {
+          this.lockSent = true;
+          var self = this;
+          this.post("/api/lock", {}).then(function () { self.screen = "main"; self.poll(); })
+            .catch(function () {}).then(function () { self.lockSent = false; });
         }
       },
 
-      /* Short word under the number. The operator must be able to tell "I have
-         this" from "someone else has this" without reading a legend. */
-      laneCaption: function (lane) {
-        if (lane.id === this.pendingLaneId) return "…";
-        if (lane.status === "self")  return this.held ? "ON HOLD" : "RELEASE";
-        if (lane.status === "busy")  return "IN USE";
-        if (lane.status === "hold")  return "PARKED";
-        if (lane.status === "error") return "FAULT";
-        return lane.label;
+      wake: function () {
+        this.screensaver = false;
+        this.lastActivity = Date.now();
       },
 
-      /* Spelled out rather than built by concatenation: Tailwind only emits
-         classes it can literally see, and "bg-tag-" + tag is invisible to it. */
-      tagClass: function (lane) {
-        var map = {
-          red: "bg-tag-red", blue: "bg-tag-blue", green: "bg-tag-green",
-          yellow: "bg-tag-yellow", purple: "bg-tag-purple", none: "bg-tag-none"
-        };
-        return map[lane.tag] || "bg-tag-none";
+      /* ================= backend ================= */
+
+      request: function (path, options) {
+        var controller = new AbortController();
+        var timer = setTimeout(function () { controller.abort(); }, TIMERS.requestTimeoutMs);
+        var init = Object.assign({ signal: controller.signal }, options || {});
+        return fetch(path, init)
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+              if (!response.ok) {
+                var error = new Error(body.error || path + " -> " + response.status);
+                error.status = response.status;
+                throw error;
+              }
+              return body;
+            });
+          })
+          .finally(function () { clearTimeout(timer); });
       },
 
-      meterSegmentClass: function (index) {
-        var level = (this.hasLane && !this.mute && !this.held) ? this.level : 0;
-        var lit = Math.round((level / 100) * this.meterSegments);
-
-        if (index >= lit) return "bg-line-d";
-
-        var position = index / this.meterSegments;
-        if (position >= 0.85) return "bg-danger";
-        if (position >= 0.7) return "bg-warn";
-        return "bg-on";
+      /* POST a command. A refusal's reason comes from the backend, written for
+         the operator, and is shown in the status line. */
+      post: function (path, body) {
+        var self = this;
+        return this.request(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body || {})
+        }).catch(function (error) {
+          self.say(error.message || "That didn't work");
+          throw error;
+        });
       },
 
-      /* ---------- theme ----------
-         Marketing has not approved a palette and production is late 2027, so no
-         colour is compiled in. Tailwind v4 theme tokens ARE custom properties,
-         which is what makes a runtime restyle free. */
+      say: function (text) {
+        this.notice = text;
+        this.noticeUntil = Date.now() + TIMERS.noticeMs;
+      },
 
-      /* Makes the page match `tokens` exactly: sets what is there and REMOVES
-         overrides that are no longer there, so going back to the default
-         theme ({}) restores the compiled colours instead of leaving the last
-         brand on screen until a reload. Skips the work when nothing changed,
-         since this runs on every poll. */
+      poll: function () {
+        var self = this;
+        this.request("/api/status")
+          .then(function (data) { self.connected = true; self.applyStatus(data); })
+          .catch(function () { self.connected = false; });
+      },
+
+      applyStatus: function (data) {
+        if (!data || typeof data !== "object") return;
+        if (typeof data.api === "number") this.backendApi = data.api;
+        if (typeof data.now === "number") this.serverOffset = data.now - Date.now() / 1000;
+        if (data.console && typeof data.console === "object") this.consoleInfo = data.console;
+        if (Array.isArray(data.devices)) this.devices = data.devices;
+        if ("call" in data) this.call = data.call;
+        if (Array.isArray(data.outputs)) this.outputs = data.outputs;
+        if (data.session && typeof data.session === "object") {
+          var wasLocked = this.locked;
+          this.session = data.session;
+          if (!wasLocked && this.locked) this.onLocked();
+        }
+        if (data.sync) this.sync = data.sync;
+        if (typeof data.service_panel === "boolean") this.servicePanel = data.service_panel;
+        if (data.features) this.features = data.features;
+        if (data.branding) this.branding = data.branding;
+        if (typeof data.message === "string") this.message = data.message;
+
+        /* v1 is Hamilton-branded only; a customer theme applies only once the
+           backend turns customer branding on. */
+        this.applyTheme(this.features.customer_branding ? (this.branding.theme || {}) : {});
+
+        if (this.pendingLane && (this.call || !this.pendingLaneAlive())) this.pendingLane = "";
+      },
+
+      pendingLaneAlive: function () {
+        return Date.now() - this.pendingAt < TIMERS.requestTimeoutMs;
+      },
+
+      /* Sets what the theme sets and removes what it no longer sets, so
+         returning to the default restores the compiled colours. */
       applyTheme: function (tokens) {
         if (!tokens || typeof tokens !== "object") return;
-
         var sig = JSON.stringify(tokens);
         if (sig === this.themeSig) return;
         this.themeSig = sig;
-
         var root = document.documentElement.style;
         var applied = [];
         Object.keys(tokens).forEach(function (name) {
@@ -363,383 +561,530 @@ document.addEventListener("alpine:init", function () {
             applied.push(name);
           }
         });
-
         this.themeKeys.forEach(function (name) {
           if (applied.indexOf(name) === -1) root.removeProperty("--color-" + name);
         });
         this.themeKeys = applied;
       },
 
-      /* ---------- backend ---------- */
+      /* ================= lanes ================= */
 
-      request: function (path, options) {
-        var controller = new AbortController();
-        var timer = setTimeout(function () {
-          controller.abort();
-        }, this.requestTimeoutMs);
+      laneVars: function (lane) { return laneVars(lane && lane.color); },
 
-        var init = Object.assign({ signal: controller.signal }, options || {});
-
-        return fetch(path, init)
-          .then(function (response) {
-            return response.json().then(function (body) {
-              if (!response.ok) {
-                var error = new Error(body.error || path + " -> " + response.status);
-                error.status = response.status;
-                error.body = body;
-                throw error;
-              }
-              return body;
-            });
-          })
-          .finally(function () {
-            clearTimeout(timer);
-          });
+      laneState: function (lane) {
+        return (lane && lane.call && lane.call.state) || "idle";
       },
 
-      post: function (path, body) {
+      /* LED behaviour only (on/off/blink speed/brightness), never colour, so
+         it reads the same for colour-blind operators. */
+      ledClass: function (lane) {
+        if (lane.health === "error") return "led-fault";
+        if (lane.id === this.pendingLane) return "led-pending";
+        return {
+          idle: "led-off", ringing: "led-fast", active: "led-on",
+          busy: "led-dim", held: "led-slow"
+        }[this.laneState(lane)] || "led-off";
+      },
+
+      ledLabel: function (lane) {
+        var name = "Lane " + lane.number;
+        if (lane.health === "error") return name + ", out of service";
+        return name + ", " + ({
+          idle: "no call. Tap to call",
+          ringing: "ringing. Tap to answer",
+          active: "in your call",
+          busy: "in a call on another console",
+          held: "on hold. Tap to call back"
+        }[this.laneState(lane)] || "");
+      },
+
+      /* One touch: answer if ringing, otherwise place a call. Rejoining a held
+         lane is simply a new call. A busy lane does nothing but say why. */
+      tapLane: function (lane) {
         var self = this;
-
-        return this.request(path, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        }).catch(function (error) {
-          /* Includes the Master Controller's reason for refusing a lane, which
-             arrives as the body of a 409. */
-          self.say(error.message || ("Command failed: " + path));
-          throw error;
-        });
+        var st = this.laneState(lane);
+        if (lane.health === "error") return this.say("Lane " + lane.number + " is out of service");
+        if (st === "busy") return this.say("Lane " + lane.number + " is in a call on another console");
+        if (st === "active" || this.pendingLane) return;
+        this.pendingLane = lane.id;
+        this.pendingAt = Date.now();
+        this.post("/api/call", { lane: lane.id })
+          .then(function () { self.poll(); })
+          .catch(function () { self.pendingLane = ""; });
       },
 
-      /* Shows text in the status line for a few seconds, outranking whatever
-         the backend reports in the meantime. */
-      say: function (text) {
-        this.notice = text;
-        this.noticeUntil = Date.now() + this.noticeMs;
+      elapsed: function (since) {
+        if (!since) return "";
+        var s = Math.max(0, Math.floor(this.nowS - since));
+        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        return (h ? h + ":" + pad2(m) : m) + ":" + pad2(s % 60);
       },
 
-      poll: function () {
+      /* ================= active call ================= */
+
+      hangUp: function () {
         var self = this;
-
-        this.request("/api/status")
-          .then(function (data) {
-            self.connected = true;
-            self.applyStatus(data);
-          })
-          .catch(function () {
-            self.connected = false;
-            self.online = false;
-            /* Losing the backend outranks any notice still on screen — it is
-               the more important thing to be telling the operator. */
-            self.notice = "";
-            self.message = "No response from backend";
-          });
+        this.post("/api/call/hangup", {}).then(function () { self.poll(); }).catch(function () {});
       },
 
-      applyStatus: function (data) {
-        if (!data || typeof data !== "object") return;
-
-        /* Expiry has to be an assignment, not just a comparison in the getter:
-           Alpine re-runs an effect when a value it read changes, and a clock
-           passing a deadline changes nothing it is watching. */
-        if (this.notice && Date.now() >= this.noticeUntil) this.notice = "";
-
-        if (Array.isArray(data.lanes)) this.lanes = data.lanes;
-        if (typeof data.lane === "number") {
-          this.activeLaneId = data.lane;
-          /* The request resolved one way or the other — stop showing pending. */
-          if (this.pendingLaneId && this.pendingLaneId === data.lane) {
-            this.pendingLaneId = 0;
-          }
-        }
-
-        if (typeof data.api === "number")         this.backendApi = data.api;
-        if (typeof data.online === "boolean")     this.online = data.online;
-        if (typeof data.hardware === "boolean")   this.hardware = data.hardware;
-        if (typeof data.title === "string")       this.title = data.title;
-        if (typeof data.held === "boolean")       this.held = data.held;
-        if (typeof data.mic === "boolean")        this.mic = data.mic;
-        if (typeof data.mute === "boolean")       this.mute = data.mute;
-        if (typeof data.level === "number")       this.level = clamp(data.level, 0, 100);
-        if (typeof data.volume === "number")      this.volume = clamp(data.volume, 0, 100);
-        if (typeof data.brightness === "number")  this.brightness = clamp(data.brightness, 0, 100);
-        if (typeof data.audio_out === "string")   this.audioOut = data.audio_out;
-        if (typeof data.user_mgmt === "boolean")  this.userMgmt = data.user_mgmt;
-        if (Array.isArray(data.modules))          this.modules = data.modules;
-        if (typeof data.message === "string")     this.message = data.message;
-
-        if (this.controlsPositions.indexOf(data.layout) !== -1) {
-          this.controlsPosition = data.layout;
-        }
-
-        this.applyTheme(data.theme);
-
-        /* The stored brand selection, so the picker shows what is applied.
-           Not overwritten while the keyboard is open, so an in-progress custom
-           entry is not yanked out from under the installer by a poll. */
-        if (data.brand && typeof data.brand === "object" && !this.kb.open) {
-          this.brand = {
-            base: typeof data.brand.base === "string" ? data.brand.base : "",
-            shade: typeof data.brand.shade === "string" ? data.brand.shade : "base",
-          };
-          if (!this.brandHue) this.brandHue = this.brand.base;
-        }
-
-        /* Lane count can shrink under us, leaving the tab out of range. */
-        if (this.tab >= this.tabCount) this.tab = this.tabCount - 1;
-      },
-
-      /* ---------- lane actions ---------- */
-
-      selectLane: function (lane) {
+      holdCall: function () {
         var self = this;
-
-        if (lane.status === "busy" || lane.status === "error") {
-          /* Say why rather than doing nothing — a dead tap reads as a broken
-             screen. */
-          this.say(lane.status === "busy"
-            ? lane.label + " is in use by " + (lane.owner || "another console")
-            : lane.label + " is out of service");
-          return;
-        }
-
-        var release = (lane.id === this.activeLaneId);
-
-        if (release) {
-          this.activeLaneId = 0;
-          this.held = false;
-          this.mic = false;
-          this.mute = true;
-          this.post("/api/lane", { lane: 0 }).catch(function () {});
-          return;
-        }
-
-        /* A request, not a decision — the Master Controller grants it. */
-        this.pendingLaneId = lane.id;
-        this.post("/api/lane", { lane: lane.id })
-          .catch(function () {
-            self.pendingLaneId = 0;   /* denied; the poll keeps the true state */
-          });
-      },
-
-      toggleHold: function () {
-        if (!this.hasLane) return;
-
-        this.held = !this.held;
-        this.post("/api/hold", { on: this.held }).catch(function () {});
+        this.post("/api/call/hold", {}).then(function () { self.poll(); }).catch(function () {});
       },
 
       toggleMic: function () {
-        if (!this.hasLane) return;
-        this.mic = !this.mic;
-        this.post("/api/mic", { on: this.mic }).catch(function () {});
-      },
-
-      toggleMute: function () {
-        if (!this.hasLane) return;
-        this.mute = !this.mute;
-        this.post("/api/mute", { on: this.mute }).catch(function () {});
-      },
-
-      setAudioOut: function (id) {
-        this.audioOut = id;
-        this.post("/api/audio-out", { id: id }).catch(function () {});
+        if (!this.call) return;
+        this.call.mic_muted = !this.call.mic_muted;
+        this.post("/api/call/mic", { muted: this.call.mic_muted }).catch(function () {});
       },
 
       nudgeVolume: function (delta) {
-        this.volume = clamp(this.volume + delta, 0, 100);
-        this.post("/api/volume", { value: this.volume }).catch(function () {});
+        if (!this.call) return;
+        this.call.volume = clamp(this.call.volume + delta, 0, 100);
+        this.post("/api/call/volume", { value: this.call.volume }).catch(function () {});
       },
 
-      nudgeBrightness: function (delta) {
-        this.brightness = clamp(this.brightness + delta, 0, 100);
-        this.post("/api/brightness", { value: this.brightness }).catch(function () {});
+      setOutput: function (id) {
+        if (!this.call || this.call.output === id) return;
+        this.call.output = id;
+        this.post("/api/call/output", { id: id }).catch(function () {});
       },
 
-      setControlsPosition: function (position) {
-        if (this.controlsPositions.indexOf(position) === -1) return;
-        this.controlsPosition = position;
-        this.post("/api/layout", { position: position }).catch(function () {});
+      outputName: function (id) {
+        var o = this.outputs.find(function (x) { return x.id === id; });
+        return o ? o.name : id;
       },
 
-      /* ---------- screens and auth ---------- */
+      /* ================= locked screen ================= */
+
+      onLocked: function () {
+        this.screen = "main";
+        var last = this.session.last_user;
+        this.login = { username: last && last !== BUILTIN_USER ? last : "", valid: false,
+                       pin: "", error: "", checking: false };
+        if (this.login.username) this.checkUser(this.login.username);
+      },
+
+      editUsername: function () {
+        var self = this;
+        this.promptKeyboard({
+          mode: "text", label: "Your name", value: this.login.username, max: 32,
+          commit: function (value) { self.checkUser(value); }
+        });
+      },
+
+      /* An unknown name is flagged at once, checked against the Master's list. */
+      checkUser: function (name) {
+        var self = this;
+        name = (name || "").trim();
+        this.login.username = name;
+        this.login.valid = false;
+        this.login.pin = "";
+        this.login.error = "";
+        if (!name) return;
+        this.login.checking = true;
+        this.post("/api/login/check", { username: name })
+          .then(function (res) {
+            self.login.valid = !!res.valid;
+            if (!res.valid) self.login.error = "No active user named “" + name + "”";
+          })
+          .catch(function () {})
+          .then(function () { self.login.checking = false; });
+      },
+
+      pinKey: function (digit) {
+        if (!this.login.valid || this.login.pin.length >= this.session.pin_length) return;
+        this.login.error = "";
+        this.login.pin += digit;
+        if (this.login.pin.length === this.session.pin_length) this.submitLogin();
+      },
+
+      pinBack: function () { this.login.pin = this.login.pin.slice(0, -1); },
+
+      /* Unlimited attempts, no lockout; a wrong PIN just clears the dots. */
+      submitLogin: function () {
+        var self = this;
+        this.request("/api/login", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: this.login.username, pin: this.login.pin })
+        }).then(function () {
+          self.login.pin = "";
+          self.screen = "main";
+          self.poll();
+        }).catch(function (e) {
+          self.login.pin = "";
+          self.login.error = e.message || "Incorrect PIN";
+        });
+      },
+
+      /* ================= navigation ================= */
 
       go: function (screen) {
+        if (screen === "settings" && !this.can("settings")) return;
         this.screen = screen;
-        this.settingsOpen = false;
-        if (screen === "troubleshooting") this.loadLogs();
+        this.lastActivity = Date.now();
+        if (screen === "settings") this.loadSettings();
+        if (screen === "help") this.loadHelp();
+        if (screen === "troubleshooting") this.chainSelected = "";
       },
 
-      /* Leaving a protected screen re-locks it: an installer who walks away
-         should not leave the configuration open behind them. */
-      leave: function () {
-        this.unlocked = {};
-        this.screen = "main";
-      },
-
-      /* The password is checked by the backend and never held here. */
-      unlock: function (scope) {
+      /* Hidden Developer entry: a long press on the logo, on the Locked and
+         Troubleshooting screens only (the two paths the doc confirms). */
+      logoPressStart: function () {
         var self = this;
-        this.authError = "";
+        if (this.view !== "locked" && this.view !== "troubleshooting") return;
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = setTimeout(function () { self.enterDeveloper(); }, TIMERS.longPressMs);
+      },
 
+      logoPressEnd: function () { clearTimeout(this.longPressTimer); },
+
+      confirm: function (options) {
+        this.confirmBox = {
+          open: true, title: options.title, body: options.body || "",
+          okLabel: options.okLabel || "OK", danger: !!options.danger, action: options.action
+        };
+      },
+
+      confirmOk: function () {
+        var action = this.confirmBox.action;
+        this.confirmBox.open = false;
+        if (action) action();
+      },
+
+      /* Restarts the UI/software only; the audio system is untouched. */
+      askReboot: function () {
+        var self = this;
+        if (this.call) return this.say("Hang up before restarting");
+        this.confirm({
+          title: "Restart this console's software?",
+          body: "The screen restarts. Calls and the audio system are not affected.",
+          okLabel: "Restart", danger: true,
+          action: function () {
+            self.post("/api/reboot", {}).then(function () {
+              self.restarting = true;
+              setTimeout(function () { window.location.reload(); }, 4000);
+            }).catch(function () {});
+          }
+        });
+      },
+
+      /* ================= troubleshooting ================= */
+
+      healthIcon: function (health) {
+        return { ok: "✓", warning: "!", error: "✕" }[health] || "?";
+      },
+
+      /* Where a chain problem starts: the first device in chain order that is
+         in error. Everything after it may be failing only because of it. */
+      get chainOrigin() {
+        var first = this.chain.find(function (d) { return d.health === "error"; });
+        return first ? first.id : "";
+      },
+
+      get chainSelectedDevice() {
+        var id = this.chainSelected;
+        return this.devices.find(function (d) { return d.id === id; }) || null;
+      },
+
+      deviceName: function (d) {
+        if (!d) return "";
+        if (d.kind === "lane") return "Lane " + d.number;
+        var n = d.id.replace(/^\D+/, "");
+        return "Console " + n + (d.role === "master" ? " (Master)" : "") +
+               (d.id === this.consoleInfo.id ? " · this one" : "");
+      },
+
+      exportLog: function () {
+        var self = this;
+        this.post("/api/logs/export", {}).then(function (res) {
+          self.say("Log saved: " + (res.file || "done"));
+        }).catch(function () {});
+      },
+
+      restartLaneAudio: function (lane) {
+        var self = this;
+        this.confirm({
+          title: "Restart audio on Lane " + lane.number + "?",
+          body: "Restarts that lane's audio hardware over the A2B chain. Any call on it is dropped.",
+          okLabel: "Restart lane audio", danger: true,
+          action: function () {
+            self.post("/api/lane/restart-audio", { lane: lane.id })
+              .then(function () { self.say("Restarting audio on Lane " + lane.number); self.poll(); })
+              .catch(function () {});
+          }
+        });
+      },
+
+      loadHelp: function () {
+        var self = this;
+        this.help.doc = null;
+        this.help.page = 0;
+        this.request("/api/help").then(function (res) { self.help.docs = res.docs || []; })
+          .catch(function () { self.help.docs = []; });
+      },
+
+      openHelp: function (doc) { this.help.doc = doc; this.help.page = 0; },
+
+      /* ================= developer ================= */
+
+      enterDeveloper: function () {
+        var self = this;
+        var from = this.view;
         this.promptKeyboard({
-          mode: "number",
-          label: scope === "developer" ? "Developer password" : "Configuration password",
-          secret: true,
+          mode: "text", label: "Developer password", secret: true, max: 32,
           commit: function (value) {
             self.request("/api/auth", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ scope: scope, password: value })
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ scope: "developer", password: value })
             }).then(function () {
-              self.unlocked[scope] = true;
-              self.go(scope === "developer" ? "developer" : "config");
-            }).catch(function () {
-              self.authError = "Incorrect password";
+              self.dev = { unlocked: true, mode: null, returnTo: from, log: [] };
+              self.lastActivity = Date.now();
+            }).catch(function () { self.say("Incorrect developer password"); });
+          }
+        });
+      },
+
+      /* One destination per visit: switching means leaving and re-entering
+         the password, on purpose. */
+      chooseDev: function (mode) {
+        this.dev.mode = mode;
+        if (mode === "applog") this.pollAppLog();
+      },
+
+      pollAppLog: function () {
+        var self = this;
+        if (!this.dev.unlocked || this.dev.mode !== "applog") return;
+        this.request("/api/app-log").then(function (res) {
+          self.dev.log = res.entries || [];
+          self.$nextTick(function () {
+            var box = self.$refs.applog;
+            if (box) box.scrollTop = box.scrollHeight;
+          });
+        }).catch(function () {});
+        setTimeout(function () { self.pollAppLog(); }, 2000);
+      },
+
+      exitDeveloper: function () {
+        var back = this.dev.returnTo === "troubleshooting" ? "troubleshooting" : "main";
+        this.dev = { unlocked: false, mode: null, returnTo: "troubleshooting", log: [] };
+        this.screen = back;
+      },
+
+      /* ================= settings (Master only) ================= */
+
+      loadSettings: function () {
+        var self = this;
+        this.settingsResult = "";
+        this.request("/api/settings").then(function (res) {
+          self.settings = res;
+          if (!self.settingsConsole && res.consoles && res.consoles.length) {
+            self.settingsConsole = res.consoles[0].id;
+          }
+          if (self.settingsTab === "users" && !self.can("manage_users")) self.settingsTab = "lanes";
+        }).catch(function (e) { self.say(e.message); self.screen = "main"; });
+      },
+
+      saveSetting: function (path, body, done) {
+        var self = this;
+        return this.post(path, body).then(function (res) {
+          self.loadSettings();
+          self.poll();
+          if (done) done(res);
+        }).catch(function () {});
+      },
+
+      get settingsConsoleObj() {
+        var id = this.settingsConsole;
+        return (this.settings && this.settings.consoles || []).find(function (c) { return c.id === id; }) || null;
+      },
+
+      editLaneNumber: function (lane) {
+        var self = this;
+        this.promptKeyboard({
+          mode: "number", label: "Number for this lane (1-16)", value: String(lane.number), max: 2,
+          commit: function (value) {
+            var n = parseInt(value, 10);
+            if (!(n >= 1 && n <= 16)) return self.say("Lane numbers are 1 to 16");
+            self.saveSetting("/api/settings/lane", { lane: lane.id, number: n });
+          }
+        });
+      },
+
+      pickLaneColor: function (lane) {
+        var self = this;
+        this.picker = {
+          open: true, kind: "color", title: "Colour for Lane " + lane.number, value: lane.color,
+          options: LANE_COLOR_ORDER.map(function (id) {
+            var users = (self.settings.lanes || []).filter(function (l) { return l.color === id && l.id !== lane.id; })
+              .map(function (l) { return "Lane " + l.number; });
+            return { id: id, label: id, hint: users.join(", ") };
+          }),
+          commit: function (id) { self.saveSetting("/api/settings/lane", { lane: lane.id, color: id }); }
+        };
+      },
+
+      pickerChoose: function (id) {
+        var commit = this.picker.commit;
+        this.picker.open = false;
+        if (commit) commit(id);
+      },
+
+      setConsoleDefault: function (field, value) {
+        var body = { console: this.settingsConsole };
+        body[field] = value;
+        this.saveSetting("/api/settings/console", body);
+      },
+
+      autolockText: function (mins) {
+        var h = Math.floor(mins / 60), m = mins % 60;
+        return (h ? h + " h" : "") + (h && m ? " " : "") + (m ? m + " min" : "");
+      },
+
+      nudgeAutolock: function (delta) {
+        var v = clamp(this.settings.site.autolock_minutes + delta, 15, 480);
+        this.saveSetting("/api/settings/site", { autolock_minutes: v });
+      },
+
+      setLoginRequired: function (on) {
+        var self = this;
+        if (!on) return this.saveSetting("/api/settings/site", { login_required: false });
+        this.confirm({
+          title: "Require login on every console?",
+          body: "Tellers will sign in with their name and a 4-digit PIN. Consoles lock after " +
+                this.autolockText(this.settings.site.autolock_minutes) + " without activity.",
+          okLabel: "Require login",
+          action: function () { self.saveSetting("/api/settings/site", { login_required: true }); }
+        });
+      },
+
+      pickRole: function (title, current, includeDisabled, commit) {
+        var roles = USER_ROLES.slice().reverse();
+        if (includeDisabled) roles.push("disabled");
+        this.picker = {
+          open: true, kind: "role", title: title, value: current,
+          options: roles.map(function (r) {
+            return { id: r, label: ROLE_LABELS[r],
+                     hint: r === "disabled" ? "No access to anything; the record is kept" : "" };
+          }),
+          commit: commit
+        };
+      },
+
+      /* New user: name, then a 4-digit PIN, then a role. Admin/Owner only. */
+      addUser: function () {
+        var self = this;
+        this.promptKeyboard({
+          mode: "text", label: "New user's name", max: 32,
+          commit: function (name) {
+            name = (name || "").trim();
+            if (!name) return;
+            self.promptKeyboard({
+              mode: "pin", label: "4-digit PIN for " + name, secret: true, max: 4,
+              commit: function (pin) {
+                if (!/^\d{4}$/.test(pin)) return self.say("A PIN is exactly 4 digits");
+                self.pickRole("Role for " + name, "user", false, function (role) {
+                  self.saveSetting("/api/users", { name: name, pin: pin, role: role }, function () {
+                    self.say(name + " added as " + ROLE_LABELS[role]);
+                  });
+                });
+              }
             });
           }
         });
       },
 
-      loadLogs: function () {
+      /* Accounts are never deleted: removing access means Disabled. */
+      changeRole: function (u) {
         var self = this;
-        this.request("/api/logs")
-          .then(function (data) { self.logs = data.entries || []; })
-          .catch(function () { self.logs = []; });
-      },
-
-      /* ---------- installer configuration ---------- */
-
-      setLaneCount: function (count) {
-        count = clamp(count, this.minLanes, this.maxLanes);
-        this.post("/api/lanes", { count: count }).catch(function () {});
-      },
-
-      setLaneField: function (lane, field, value) {
-        var body = { lane: lane.id };
-        body[field] = value;
-        lane[field] = value;
-        this.post("/api/lane-config", body).catch(function () {});
-      },
-
-      editLaneLabel: function (lane) {
-        var self = this;
-        this.promptKeyboard({
-          mode: "text",
-          label: "Name for lane " + lane.id,
-          value: lane.label,
-          commit: function (value) { self.setLaneField(lane, "label", value); }
+        this.pickRole("Role for " + u.name, u.role, true, function (role) {
+          self.saveSetting("/api/users/update", { name: u.name, role: role });
         });
       },
+
+      resetPin: function (u) {
+        var self = this;
+        this.promptKeyboard({
+          mode: "pin", label: "New 4-digit PIN for " + u.name, secret: true, max: 4,
+          commit: function (pin) {
+            if (!/^\d{4}$/.test(pin)) return self.say("A PIN is exactly 4 digits");
+            self.saveSetting("/api/users/update", { name: u.name, pin: pin }, function () {
+              self.say("PIN reset for " + u.name);
+            });
+          }
+        });
+      },
+
+      saveConfig: function () {
+        var self = this;
+        this.saveSetting("/api/config/save", {}, function (res) {
+          self.settingsResult = "Saved: " + (res.file || "configuration backed up");
+        });
+      },
+
+      restoreConfig: function () {
+        var self = this;
+        this.confirm({
+          title: "Restore the saved configuration?",
+          body: "Lanes, console defaults, users and site settings are replaced with the backup and sent to every console.",
+          okLabel: "Restore", danger: true,
+          action: function () {
+            self.saveSetting("/api/config/restore", {}, function () {
+              self.settingsResult = "Configuration restored";
+            });
+          }
+        });
+      },
+
+      /* ---- customer branding tab (later version) ---- */
+      brandHues: [
+        { name: "Navy", hex: "#2B2A5E" }, { name: "Royal", hex: "#1A4F9C" },
+        { name: "Sky", hex: "#0E6FB2" }, { name: "Teal", hex: "#0E7A88" },
+        { name: "Green", hex: "#1F8A4C" }, { name: "Forest", hex: "#14562E" },
+        { name: "Burgundy", hex: "#7A1F3D" }, { name: "Red", hex: "#C0392B" },
+        { name: "Orange", hex: "#C15A12" }, { name: "Bronze", hex: "#8A6D2A" },
+        { name: "Purple", hex: "#5B3E9B" }, { name: "Graphite", hex: "#33343A" }
+      ],
+      brandShades: [{ id: "light", label: "Light" }, { id: "base", label: "Base" }, { id: "dark", label: "Dark" }],
+
+      setBrand: function (baseHex, shade) {
+        var theme = deriveBrandTheme(baseHex, shade);
+        if (!Object.keys(theme).length) return;
+        this.saveSetting("/api/brand", { base: baseHex, shade: shade, theme: theme });
+      },
+
+      shadeSwatch: function (baseHex, shade) { return deriveBrandTheme(baseHex, shade).navy || baseHex; },
 
       editTitle: function () {
         var self = this;
         this.promptKeyboard({
-          mode: "text",
-          label: "Screen title",
-          value: this.title,
-          commit: function (value) {
-            self.title = value;
-            self.post("/api/title", { text: value }).catch(function () {});
-          }
+          mode: "text", label: "Screen title", value: this.branding.title, max: 31,
+          commit: function (value) { self.saveSetting("/api/title", { text: value }); }
         });
       },
 
-      /* ---------- brand colour ---------- */
-
-      /* The hue whose shade ramp is shown: the last one tapped, else the
-         applied brand, else Hamilton navy. */
-      get activeHue() {
-        return this.brandHue || this.brand.base || this.hues[0].hex;
-      },
-
-      isHue: function (hex) {
-        return this.brand.base.toLowerCase() === hex.toLowerCase();
-      },
-
-      isShade: function (shade) {
-        return this.isHue(this.activeHue) && this.brand.shade === shade;
-      },
-
-      /* The chrome colour a given hue+shade produces — used to paint the ramp
-         swatches so they preview the real result, pale to deep. */
-      shadeSwatch: function (baseHex, shade) {
-        return deriveBrandTheme(baseHex, shade).navy || baseHex;
-      },
-
-      /* The text colour that swatch needs, so the label on it stays readable. */
-      shadeInk: function (baseHex, shade) {
-        return deriveBrandTheme(baseHex, shade).onchrome || "#FFFFFF";
-      },
-
-      /* Tapping a hue applies it, keeping the current shade, and reveals its
-         ramp so the shade can be changed. */
-      pickHue: function (hex) {
-        this.brandHue = hex;
-        this.setBrand(hex, this.brand.shade || "base");
-      },
-
-      /* Derive, apply immediately (so the change is instant), then tell the
-         backend, which stores the selection and the derived palette. */
-      setBrand: function (baseHex, shade) {
-        var theme = deriveBrandTheme(baseHex, shade);
-        if (!Object.keys(theme).length) return;   /* not a colour */
-
-        this.applyTheme(theme);
-        this.brand = { base: baseHex, shade: shade };
-        this.brandHue = baseHex;
-        this.post("/api/brand", { base: baseHex, shade: shade, theme: theme })
-          .catch(function () {});
-      },
-
-      /* Exact brand match: type a hex. The same derivation runs, so a custom
-         colour is as legible as a preset. */
-      customBrand: function () {
-        var self = this;
-        this.promptKeyboard({
-          mode: "hex",
-          label: "Brand colour hex (e.g. 1F5FB0)",
-          value: "",                       /* start fresh; typing 6 chars is quick */
-          commit: function (value) {
-            var hex = "#" + String(value).replace(/[^0-9a-fA-F]/g, "").slice(0, 6);
-            if (!hexToRgb(hex)) { self.say("Enter a 6-digit hex colour"); return; }
-            self.setBrand(hex, self.brand.shade || "base");
-          }
-        });
-      },
-
-      /* ---------- on-screen keyboard ---------- */
+      /* ================= on-screen keyboard ================= */
 
       promptKeyboard: function (options) {
-        this.kb.open = true;
-        this.kb.mode = options.mode || "number";
-        this.kb.label = options.label || "";
-        this.kb.value = options.value || "";
-        this.kb.secret = !!options.secret;
-        this.kb.commit = options.commit || null;
+        this.kb = {
+          open: true, mode: options.mode || "number", label: options.label || "",
+          value: options.value || "", secret: !!options.secret,
+          commit: options.commit || null, max: options.max || 32
+        };
       },
 
       kbKey: function (key) {
-        if (this.kb.value.length < 32) this.kb.value += key;
+        if (this.kb.value.length < this.kb.max) this.kb.value += key;
       },
 
-      kbBackspace: function () {
-        this.kb.value = this.kb.value.slice(0, -1);
-      },
+      kbBackspace: function () { this.kb.value = this.kb.value.slice(0, -1); },
 
-      kbCancel: function () {
-        this.kb.open = false;
-        this.kb.commit = null;
-      },
+      kbCancel: function () { this.kb.open = false; this.kb.commit = null; },
 
       kbAccept: function () {
-        var commit = this.kb.commit;
-        var value = this.kb.value;
-
+        var commit = this.kb.commit, value = this.kb.value;
         this.kb.open = false;
         this.kb.commit = null;
-
         if (commit) commit(value);
       },
 
@@ -748,39 +1093,27 @@ document.addEventListener("alpine:init", function () {
       },
 
       kbRows: function () {
-        if (this.kb.mode === "number") {
+        if (this.kb.mode === "number" || this.kb.mode === "pin") {
           return [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["0"]];
         }
         if (this.kb.mode === "hex") {
-          /* A colour needs digits AND A–F; neither of the other layouts has
-             both. */
-          return [
-            ["0", "1", "2", "3", "4", "5", "6", "7"],
-            ["8", "9", "A", "B", "C", "D", "E", "F"]
-          ];
+          return [["0", "1", "2", "3", "4", "5", "6", "7"], ["8", "9", "A", "B", "C", "D", "E", "F"]];
         }
         return [
+          ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
           ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-          ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-          ["Z", "X", "C", "V", "B", "N", "M", "-", " "]
+          ["A", "S", "D", "F", "G", "H", "J", "K", "L", "'"],
+          ["Z", "X", "C", "V", "B", "N", "M", "-", ".", " "]
         ];
       }
     };
   });
 });
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-/* Held-down feedback, delegated once for every button on the page.
- *
- * Not :active, which sticks on some touch panels when a press is cancelled
- * mid-gesture. Kept out of Alpine because it is presentation only — routing it
- * through component state would re-render the tree on every press.
- *
- * Taps themselves bind to pointerup in the markup (click is unreliable under
- * WPE) with Alpine's .throttle modifier as the duplicate-event guard. */
+/* Held-down feedback, delegated once for every button on the page. Not
+ * :active, which sticks on some touch panels when a press is cancelled
+ * mid-gesture. Taps bind to pointerup in the markup (click is unreliable under
+ * WPE), with Alpine's .throttle modifier as the duplicate-event guard. */
 document.addEventListener("pointerdown", function (event) {
   var button = event.target.closest("button");
   if (button && !button.disabled) button.classList.add("is-pressed");
@@ -788,7 +1121,7 @@ document.addEventListener("pointerdown", function (event) {
 
 ["pointerup", "pointercancel", "pointerleave"].forEach(function (name) {
   document.addEventListener(name, function (event) {
-    var button = event.target.closest("button");
+    var button = event.target.closest && event.target.closest("button");
     if (button) button.classList.remove("is-pressed");
   });
 });

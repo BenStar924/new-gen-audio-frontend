@@ -1,4 +1,4 @@
-/* Tailwind source for the Operator Console.
+/* Tailwind source for the HUBS Audio console UI.
  *
  * Built once into www/vendor/app.css — see build-css.sh. The device never
  * compiles CSS: the Play CDN is a runtime in-browser compiler and is both
@@ -8,12 +8,14 @@
  * directives and tailwind.config.js. Pin the major version: a v3 toolchain will
  * not read this file.
  *
- * COLOURS ARE PROVISIONAL. Marketing and Sales have not approved a palette, and
- * production is not until late 2027. Every colour below is therefore a CSS
- * custom property that app.js can overwrite at runtime from a theme the backend
- * supplies — see applyTheme(). Nothing here needs a rebuild to restyle, and no
- * colour may be written as a literal in markup or JS, or it will not follow the
- * theme.
+ * Every chrome colour below is a CSS custom property that app.js can overwrite
+ * at runtime (applyTheme), so a later customer-branding release needs no
+ * rebuild. v1 ships Hamilton branding only. No chrome colour may be written as
+ * a literal in markup or JS, or it will not follow the theme.
+ *
+ * Lane colours are the exception: they are identity, matching the physical
+ * LEDs on the lanes, and come from LANE_COLORS in app.js as --lane* variables
+ * set per lane. The theme never touches them.
  */
 
 @import "tailwindcss";
@@ -24,14 +26,13 @@
 @source not "./www/vendor";
 
 @theme {
-  /* --- brand chrome (provisional: Hamilton navy) --- */
+  /* --- brand chrome: Hamilton navy --- */
   --color-navy:       #2B2A5E;
   --color-navy-d:     #1B1A3E;
   --color-navy-tint:  #B9B7E8;
 
-  /* Text and icons ON the masthead. White by default because the default
-     chrome is dark navy; a LIGHT brand shade flips this to a dark ink so the
-     title stays readable. The brand picker derives it from the chrome. */
+  /* Text and icons ON the masthead. White on the default navy; a light
+     customer shade flips it to a dark ink. */
   --color-onchrome:   #FFFFFF;
 
   --color-bg:         #EDEFF5;
@@ -44,53 +45,29 @@
   --color-dim:        #6B6E8C;
   --color-mute:       #94A0BB;
 
-  /* Emphasised text on a light surface — button labels, headings. Same value
-     as --color-navy today, but a SEPARATE token on purpose: navy is also the
-     masthead background, and one token cannot be a background and a foreground
-     at once. A dark palette has to move them in opposite directions, so a
-     theme that overloaded them could not be made legible. */
+  /* Emphasised text on a light surface. Same value as navy today but a
+     separate token: navy is also the masthead background, and one token
+     cannot be a background and a foreground at once. */
   --color-ink:        #2B2A5E;
 
-  /* --- status --- */
-  /* Deliberately NOT brand colours: mic-live and speaker state have to be
-     distinguishable from the chrome and from each other at a glance. */
+  /* --- status: never brand colours --- */
   --color-on:         #1F8A4C;
   --color-on-d:       #145F35;
-  --color-warn:       #C77A10;
+  --color-warn:       #D08A12;
   --color-warn-d:     #8A540B;
   --color-danger:     #B3261E;
+  --color-danger-d:   #7D1A15;
 
-  /* --- lane states ---
-     One token per state so a lane's appearance is a theme decision, not a code
-     decision. "self" is this console holding the lane; "busy" is another
-     console talking to it and cannot be taken; "hold" is another console
-     parking it and CAN be taken. */
-  --color-lane-idle:      #F5F6FA;
-  --color-lane-idle-line: #C9CDE0;
-  --color-lane-self:      #2B2A5E;
-  --color-lane-self-line: #1B1A3E;
-  --color-lane-busy:      #E7D9D8;
-  --color-lane-busy-line: #B3261E;
-  --color-lane-hold:      #FBF0DC;
-  --color-lane-hold-line: #C77A10;
-  --color-lane-error:     #E8E8ED;
-  --color-lane-error-line:#B6B6C2;
+  /* Master Console cue on the logo plate (placeholder: final look is open). */
+  --color-master:     #E0A526;
 
-  /* --- lane colour tags ---
-     Site-configurable identity for a lane ("the red lane"). Rendered as a small
-     corner square so it can never be confused with the button's state colour. */
-  --color-tag-red:    #C0392B;
-  --color-tag-blue:   #1F6FB2;
-  --color-tag-green:  #1F8A4C;
-  --color-tag-yellow: #D4A017;
-  --color-tag-purple: #6B4BA8;
-  --color-tag-none:   transparent;
-
-  /* Touch targets are min-h-16 / min-w-16 (64px) throughout — the minimum
-     comfortable finger target on a 7" panel. */
+  /* LED housing, and the unlit lens of a lane that is out of service. */
+  --color-led-rim:    #2A2C35;
+  --color-led-fault:  #50535E;
 
   /* System stack only — no web font is reachable on the offline device. */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace;
 }
 
 /* Alpine paints x-data state on init; without this the raw pre-Alpine markup
@@ -121,51 +98,146 @@
 
   button {
     /* No transitions anywhere: the VideoCore GPU only does OpenGL ES 2.0 and
-       has no frames to spare, and press feedback wants to be immediate rather
-       than eased. */
+       has no frames to spare, and press feedback wants to be immediate. */
     transition: none !important;
+    font: inherit;
   }
 }
 
 @layer components {
-  /* Lane sizing correction.
-   *
-   * The lane count is site-configurable and the lane area changes shape with
-   * the control position, so the grid can't be a fixed template. Flex basis is
-   * computed from --lane-cols, which app.js sets to the column count that
-   * squares up best. Because the items can also grow, a final row holding
-   * fewer than --lane-cols lanes stretches to fill the width instead of
-   * leaving a ragged gap — which is what makes odd counts look deliberate
-   * rather than broken. */
-  .lane-grid {
-    --lane-gap: 0.6rem;
+  .card {
+    background: var(--color-surface);
+    border: 2px solid var(--color-line);
+    border-radius: 0.75rem;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+  }
+
+  /* ---- buttons. Touch targets are 64px (min-height 4rem) unless .btn-sm,
+     which is 44px and used only for secondary actions in dense lists. ---- */
+  .btn {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--lane-gap);
-    align-content: stretch;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 4rem;
+    padding: 0 1rem;
+    border-radius: 0.75rem;
+    border: 2px solid var(--color-line);
+    background: var(--color-alt);
+    color: var(--color-ink);
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--color-line);
+  }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn-sm {
+    min-height: 2.75rem;
+    padding: 0 0.85rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    box-shadow: 0 2px 0 var(--color-line);
+  }
+  .btn-primary, .btn-selected {
+    background: var(--color-navy);
+    border-color: var(--color-navy-d);
+    color: var(--color-onchrome);
+    box-shadow: 0 3px 0 var(--color-navy-d);
+  }
+  .btn-danger {
+    background: var(--color-danger);
+    border-color: var(--color-danger-d);
+    color: #fff;
+    box-shadow: 0 4px 0 var(--color-danger-d);
+  }
+  .btn-go {
+    background: var(--color-on);
+    border-color: var(--color-on-d);
+    color: #fff;
+    box-shadow: 0 4px 0 var(--color-on-d);
+  }
+  .btn-warn {
+    background: var(--color-warn);
+    border-color: var(--color-warn-d);
+    color: #fff;
+    box-shadow: 0 4px 0 var(--color-warn-d);
+  }
+  /* On the navy masthead. */
+  .btn-chrome {
+    background: rgb(0 0 0 / 0.18);
+    border-color: transparent;
+    color: var(--color-onchrome);
+    box-shadow: none;
   }
 
-  .lane-btn {
-    flex: 1 1 calc((100% - (var(--lane-cols) - 1) * var(--lane-gap)) / var(--lane-cols));
-    min-width: 0;
-  }
-
-  /* Held-down feedback. Driven by a delegated pointer listener in app.js rather
-     than :active, which sticks on some touch panels when a press is cancelled
-     mid-gesture. */
+  /* Held-down feedback. Driven by a delegated pointer listener in app.js
+     rather than :active, which sticks on some touch panels. */
   .is-pressed {
     filter: brightness(0.92);
   }
-
-  /* Physical-feeling press: the raised button drops onto the page. */
-  .raised.is-pressed {
+  .btn.is-pressed {
     transform: translateY(2px);
-    box-shadow: none !important;
+    box-shadow: none;
   }
 
-  /* A lane the Master Controller will not grant. Not a disabled attribute —
-     the button still reports why it cannot be taken. */
-  .lane-locked {
-    cursor: not-allowed;
+  /* ---- status light: one rule for the whole system ---- */
+  .status-dot {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 9999px;
+    border: 2px solid rgb(255 255 255 / 0.85);
+  }
+  .status-ok      { background: var(--color-on); }
+  .status-warning { background: var(--color-warn); }
+  .status-error   { background: var(--color-danger); }
+
+  /* ---- lanes ---- */
+  .lane-grid {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  /* The call-status LED pushbutton. It communicates by behaviour only (off,
+     on, dim, fast or slow blink), in the lane's own colour, so the state reads
+     the same to a colour-blind operator. Blinks use steps() so the GPU never
+     interpolates: each frame is either lit or unlit. */
+  .led {
+    border-radius: 9999px;
+    border: 4px solid var(--color-led-rim);
+    background: var(--lane-off);
+    box-shadow: inset 0 3px 6px rgb(0 0 0 / 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+  }
+  .led-off   { background: var(--lane-off); }
+  .led-on    { background: var(--lane); box-shadow: 0 0 0 3px var(--lane-dim), inset 0 -3px 6px rgb(0 0 0 / 0.2); }
+  .led-dim   { background: var(--lane-dim); }
+  .led-fast  { animation: led-blink 0.5s steps(1, end) infinite; }
+  .led-slow  { animation: led-blink 1.6s steps(1, end) infinite; }
+  .led-pending { background: var(--lane-dim); border-style: dashed; border-color: var(--lane); }
+  .led-fault { background: var(--color-led-fault); }
+
+  @keyframes led-blink {
+    0%   { background: var(--lane); }
+    50%  { background: var(--lane-off); }
+  }
+
+  /* A2B chain diagram: the node where a failure starts. */
+  .chain-origin {
+    outline: 3px solid var(--color-danger);
+    outline-offset: 2px;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
   }
 }

@@ -16,11 +16,11 @@
       "detail": "Serves www/ + the /api contract on http://127.0.0.1:8000"
     },
     {
-      "label": "Run mock backend — bottom rail, 7 lanes",
+      "label": "Run mock backend — login required, 12 lanes",
       "type": "shell",
       "command": "python3",
       "windows": { "command": "python" },
-      "args": ["dev-server.py", "8000", "--lanes", "7", "--layout", "bottom"],
+      "args": ["dev-server.py", "8000", "--lanes", "12", "--login-required"],
       "options": { "cwd": "${workspaceFolder}" },
       "isBackground": true,
       "problemMatcher": [],
