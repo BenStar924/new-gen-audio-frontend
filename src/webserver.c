@@ -276,7 +276,11 @@ static mhd_result_t handle_status(struct MHD_Connection *conn)
         level = 0;
     }
 
-    sb_add(&sb, "{\"online\":%s", s->online ? "true" : "false");
+    /* Contract version first: the UI compares it with the one it was built
+     * against and warns on screen when they differ, so a front end and a
+     * backend that have drifted apart say so instead of failing quietly. */
+    sb_add(&sb, "{\"api\":%d", CONSOLE_API_VERSION);
+    sb_add(&sb, ",\"online\":%s", s->online ? "true" : "false");
 
     json_escape(esc, sizeof(esc), s->title);
     sb_add(&sb, ",\"title\":\"%s\"", esc);
@@ -440,24 +444,25 @@ static mhd_result_t handle_command(struct MHD_Connection *conn, const char *url,
             rc = send_error(conn, MHD_HTTP_CONFLICT, reason);
         }
 
-    } else if (strcmp(url, "/api/hold") == 0) {
-        /* Parking keeps the lane ours but drops audio. Another console may then
-         * take it — that is the difference between hold and busy. */
-        rc = (json_bool(body, "on", &on) && console_set_hold(on) == 0)
-                 ? send_ok(conn)
-                 : send_error(conn, MHD_HTTP_CONFLICT, "no lane selected");
-
-    } else if (strcmp(url, "/api/mic") == 0) {
-        /* No lane id: there is one microphone enable, and it only opens while
-         * a lane is held. */
-        rc = (json_bool(body, "on", &on) && console_set_mic(on) == 0)
-                 ? send_ok(conn)
-                 : send_error(conn, MHD_HTTP_CONFLICT, "no lane selected");
-
-    } else if (strcmp(url, "/api/mute") == 0) {
-        rc = (json_bool(body, "on", &on) && console_set_mute(on) == 0)
-                 ? send_ok(conn)
-                 : send_error(conn, MHD_HTTP_CONFLICT, "no lane selected");
+    } else if (strcmp(url, "/api/hold") == 0 || strcmp(url, "/api/mic") == 0 ||
+               strcmp(url, "/api/mute") == 0) {
+        /* Two different failures, kept apart: a request with no usable `on` is
+         * malformed (400); a well-formed request with no lane held is valid but
+         * not possible right now (409). Reporting both as "no lane selected"
+         * sends whoever is debugging the caller after the wrong problem.
+         *
+         * Hold parks the lane: ours, but silent, and another console may take
+         * it. Mic and mute carry no lane id — there is one microphone enable
+         * and one amplifier, and they only open while a lane is held. */
+        if (!json_bool(body, "on", &on)) {
+            rc = send_error(conn, MHD_HTTP_BAD_REQUEST, "on must be true or false");
+        } else {
+            int res = strcmp(url, "/api/hold") == 0 ? console_set_hold(on)
+                    : strcmp(url, "/api/mic") == 0  ? console_set_mic(on)
+                                                     : console_set_mute(on);
+            rc = res == 0 ? send_ok(conn)
+                          : send_error(conn, MHD_HTTP_CONFLICT, "no lane selected");
+        }
 
     } else if (strcmp(url, "/api/volume") == 0) {
         /* Master volume: no lane id, which is what makes it structurally
@@ -540,11 +545,19 @@ static mhd_result_t handle_command(struct MHD_Connection *conn, const char *url,
         /* Passwords are compared here and never leave the device. The UI is
          * told yes or no and nothing else. */
         char scope[16];
-        rc = (json_str(body, "scope", scope, sizeof(scope)) &&
-              json_str(body, "password", text, sizeof(text)) &&
-              console_check_password(scope, text))
-                 ? send_ok(conn)
-                 : send_error(conn, MHD_HTTP_FORBIDDEN, "incorrect");
+        /* 400 for a request that cannot be a login attempt, 403 only for a
+         * real one with the wrong password — otherwise a bug in the caller
+         * reads as someone typing the wrong code. */
+        if (!json_str(body, "scope", scope, sizeof(scope)) ||
+            !json_str(body, "password", text, sizeof(text))) {
+            rc = send_error(conn, MHD_HTTP_BAD_REQUEST, "scope and password required");
+        } else if (strcmp(scope, "config") != 0 && strcmp(scope, "developer") != 0) {
+            rc = send_error(conn, MHD_HTTP_BAD_REQUEST, "unknown scope");
+        } else {
+            rc = console_check_password(scope, text)
+                     ? send_ok(conn)
+                     : send_error(conn, MHD_HTTP_FORBIDDEN, "incorrect");
+        }
 
     } else {
         rc = send_error(conn, MHD_HTTP_NOT_FOUND, "unknown endpoint");

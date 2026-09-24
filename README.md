@@ -10,8 +10,19 @@ This directory is the device front end. It is **not** part of the Next.js
 coach-platform app and shares nothing with it — no npm runtime dependency, no
 React. ESLint ignores this directory.
 
+> **Building the backend?** Start with [HANDOFF.md](HANDOFF.md): what the
+> backend must provide, in what order, and `contract-test.py` to tell you when
+> it's done. `./make-release.sh` packages everything into one tarball.
+
 ```
 operatorconsole/
+  HANDOFF.md            # START HERE if you are building the backend
+  contract-test.py      # the API contract as a test: passes = the UI works
+  make-release.sh       # -> dist/operatorconsole-ui-<version>.tar.gz
+  deploy/
+    install.sh                      # puts the UI on the device, boots into it
+    operatorconsole-kiosk.service   # Cog fullscreen on tty1, no login
+    operatorconsole.service         # backend unit (template for the C backend)
   src/
     main.c              # entry point, console state, config persistence
     webserver.c/.h      # libmicrohttpd: static files + /api endpoints
@@ -355,12 +366,19 @@ not multiply the test matrix.
 The front end holds no authority over hardware state. It polls `GET
 /api/status` once a second, mirrors what comes back, and POSTs commands. This is
 the contract shared with the C backend; `dev-server.py` implements the same one.
+`contract-test.py` checks a backend against it — both of those pass.
+
+**Status codes are part of the contract.** `400` for a malformed request
+(missing field, wrong type, out of range: rejected, never clamped); `409` for a
+well-formed request that is not possible right now (no lane held, lane busy);
+`403` only for a wrong password; `404` for an unknown endpoint.
 
 `GET /api/status` → JSON. Every field optional; the UI keeps its current value
 for anything omitted, so a partial response never blanks a control.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
+| `api` | int | Contract version, currently `1`. The UI warns on screen if it differs from its own |
 | `online` | bool | Master Controller link up |
 | `title` | string | Configurable screen title |
 | `lanes` | **array** | One object per lane (below) |

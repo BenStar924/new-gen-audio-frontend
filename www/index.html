@@ -383,6 +383,12 @@
     <div class="flex-1 min-h-0 flex flex-col gap-2.5 p-3 bg-surface border-2 border-line rounded-xl overflow-y-auto">
       <div class="grid grid-cols-2 gap-2 text-xs">
         <span class="text-dim">UI version</span><span class="tabular-nums" x-text="uiVersion"></span>
+        <span class="text-dim">API contract</span>
+        <span class="tabular-nums"
+              :class="apiMismatch ? 'text-danger font-bold' : ''"
+              x-text="backendApi === null ? `UI v${apiVersion}, backend not reporting`
+                    : apiMismatch ? `UI v${apiVersion}, backend v${backendApi} — MISMATCH`
+                    : `v${apiVersion}`"></span>
         <span class="text-dim">Backend</span><span class="tabular-nums" x-text="connected ? backendHost : 'unreachable'"></span>
         <span class="text-dim">Master Controller</span><span x-text="online ? 'online' : 'offline'"></span>
         <span class="text-dim">Hardware</span><span x-text="hardware ? 'present' : 'absent'"></span>

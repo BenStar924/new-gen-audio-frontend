@@ -1,0 +1,44 @@
+# Operator Console — the BACKEND. This unit is owned by the backend engineer.
+#
+# It is written for the reference C backend in src/ (installed by
+# `cmake --install build`). If you build your own backend, replace ExecStart
+# and keep the rest: listen on 127.0.0.1:8000, serve www/ and /api from the
+# same origin, and restart on failure. The kiosk does not reference this unit
+# by name, so rename it freely.
+#
+# Safety: while this process is down, the amplifier stays muted because the
+# boot state in config.txt (gpio=25=op,dh) holds it muted until the backend
+# takes the pin. So a crash drops audio rather than leaving a live microphone.
+#
+# Installed by `deploy/install.sh --with-backend-unit`. Paths assume the
+# default /usr/local prefix; install.sh rewrites them for any other.
+
+[Unit]
+Description=Operator Console backend (HTTP + GPIO/I2C/SPI)
+After=local-fs.target
+# Nothing here needs the network: the UI is on loopback. Add
+# After=network-online.target when the Master Controller link lands.
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/operatorconsole \
+    --port 8000 \
+    --www /usr/local/share/operatorconsole/www \
+    --config /var/lib/operatorconsole/config \
+    --theme /var/lib/operatorconsole/theme.json
+Restart=always
+RestartSec=2
+
+# Unprivileged, with just the device groups the hardware layer needs. The
+# PWM backlight under /sys/class/pwm may still need a udev rule or root; see
+# HANDOFF.md.
+User=opconsole
+Group=opconsole
+SupplementaryGroups=gpio i2c spi
+
+# Creates /var/lib/operatorconsole owned by opconsole, where the config and the
+# brand theme persist across reboots.
+StateDirectory=operatorconsole
+
+[Install]
+WantedBy=multi-user.target

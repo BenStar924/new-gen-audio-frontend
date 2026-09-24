@@ -23,6 +23,11 @@
 
 #define CONSOLE_MIN_LANES 1
 #define CONSOLE_MAX_LANES 12
+
+/* The /api contract this backend implements. Bump it when a field changes
+ * meaning or an endpoint changes behaviour, and bump the UI's apiVersion to
+ * match; contract-test.py checks it, and the UI warns on screen on mismatch. */
+#define CONSOLE_API_VERSION 1
 #define CONSOLE_NO_LANE   0
 
 #define CONSOLE_LABEL_MAX 24

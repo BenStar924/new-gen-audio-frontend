@@ -1,0 +1,56 @@
+# Operator Console — the FRONT END. Runs Cog fullscreen on tty1 at boot, with
+# no login prompt.
+#
+# This unit deliberately does not depend on the backend's unit by name. The
+# front end's only dependency is "something on 127.0.0.1:8000 speaking API v1",
+# and kiosk.sh waits for that port before starting Cog. So the backend can be
+# any process with any unit name, owned by whoever builds it.
+#
+# The session setup (PAMName, TTYPath, utmp) follows the pattern cage documents
+# for kiosk services: it gives the kiosk user a real logind session on seat0,
+# which is what grants DRM master and access to the touchscreen's input device.
+# Without it Cog cannot take the display.
+#
+# Installed by deploy/install.sh. Paths assume the default /usr/local prefix;
+# install.sh rewrites them for any other prefix.
+
+[Unit]
+Description=Operator Console kiosk (Cog fullscreen on tty1)
+After=systemd-user-sessions.service plymouth-quit-wait.service
+After=dbus.socket systemd-logind.service
+Wants=dbus.socket systemd-logind.service
+# We take tty1 over from its login prompt.
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+ConditionPathExists=/dev/tty0
+
+[Service]
+Type=simple
+User=opkiosk
+ExecStart=/usr/local/bin/kiosk.sh
+Restart=always
+RestartSec=2
+
+# Where the UI is, and how to reach the backend. The port must match the
+# backend's; kiosk.sh waits on it before starting the browser.
+Environment=CONSOLE_URL=http://127.0.0.1:8000
+Environment=CONSOLE_PORT=8000
+
+# Cog platform/display flags. Confirm against the environment guide's Display
+# Configuration section on real hardware. Empty = Cog's defaults.
+Environment=COG_ARGS=
+
+# A real session on tty1, so Cog can own the display and read the touchscreen.
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+
+[Install]
+WantedBy=multi-user.target

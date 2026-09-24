@@ -110,7 +110,18 @@ function deriveBrandTheme(baseHex, shade) {
 document.addEventListener("alpine:init", function () {
   Alpine.data("operatorConsole", function () {
     return {
-      uiVersion: "0.6.0",
+      uiVersion: "0.7.0",
+
+      /* The /api contract this UI was built against. The backend reports its
+         own in /api/status `api`; when they differ the status line says so,
+         because a front end and backend owned by different people drift, and
+         drift should be loud rather than a button that quietly does nothing.
+         Bump together with the backend's version when the contract changes. */
+      apiVersion: 1,
+      backendApi: null,        /* null until a backend reports one */
+
+      themeSig: "",            /* last theme applied, to skip no-op polls */
+      themeKeys: [],           /* token names currently overridden */
 
       pollMs: 1000,
       requestTimeoutMs: 2000,
@@ -209,7 +220,21 @@ document.addEventListener("alpine:init", function () {
 
       /* The status line. Re-evaluated on every poll, so an expired notice
          gives way to the backend's own message within a second. */
+      /* True only when the backend explicitly reports a different contract.
+         A backend that reports nothing is not flagged — the check exists to
+         catch drift, not to reject every older build. */
+      get apiMismatch() {
+        return this.backendApi !== null && this.backendApi !== this.apiVersion;
+      },
+
       get statusLine() {
+        /* A contract mismatch outranks everything: controls may silently fail
+           to do what they say, and whoever is on the bench needs to know why
+           before they start debugging the wrong thing. */
+        if (this.apiMismatch) {
+          return "Backend API v" + this.backendApi + ", this UI needs v" +
+                 this.apiVersion + " — update one side";
+        }
         if (this.notice && Date.now() < this.noticeUntil) return this.notice;
         return this.message;
       },
@@ -317,15 +342,32 @@ document.addEventListener("alpine:init", function () {
          colour is compiled in. Tailwind v4 theme tokens ARE custom properties,
          which is what makes a runtime restyle free. */
 
+      /* Makes the page match `tokens` exactly: sets what is there and REMOVES
+         overrides that are no longer there, so going back to the default
+         theme ({}) restores the compiled colours instead of leaving the last
+         brand on screen until a reload. Skips the work when nothing changed,
+         since this runs on every poll. */
       applyTheme: function (tokens) {
         if (!tokens || typeof tokens !== "object") return;
 
+        var sig = JSON.stringify(tokens);
+        if (sig === this.themeSig) return;
+        this.themeSig = sig;
+
+        var root = document.documentElement.style;
+        var applied = [];
         Object.keys(tokens).forEach(function (name) {
           var value = tokens[name];
           if (typeof value === "string" && /^[#a-zA-Z0-9(),.\s%-]+$/.test(value)) {
-            document.documentElement.style.setProperty("--color-" + name, value);
+            root.setProperty("--color-" + name, value);
+            applied.push(name);
           }
         });
+
+        this.themeKeys.forEach(function (name) {
+          if (applied.indexOf(name) === -1) root.removeProperty("--color-" + name);
+        });
+        this.themeKeys = applied;
       },
 
       /* ---------- backend ---------- */
@@ -412,6 +454,7 @@ document.addEventListener("alpine:init", function () {
           }
         }
 
+        if (typeof data.api === "number")         this.backendApi = data.api;
         if (typeof data.online === "boolean")     this.online = data.online;
         if (typeof data.hardware === "boolean")   this.hardware = data.hardware;
         if (typeof data.title === "string")       this.title = data.title;

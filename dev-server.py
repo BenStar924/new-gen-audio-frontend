@@ -30,6 +30,10 @@ WWW_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 
 MIN_LANES = 1
 MAX_LANES = 12
+
+# The /api contract version. Must match the UI's apiVersion and the C
+# backend's CONSOLE_API_VERSION; contract-test.py checks it.
+API_VERSION = 1
 LAYOUTS = ("left", "right", "bottom")
 TAGS = ("none", "red", "blue", "green", "yellow", "purple")
 
@@ -71,14 +75,54 @@ modules = [
 # the UI restyles at runtime with no rebuild.
 theme = {}
 
+# Real timestamps, so the log reads newest-first like a real one does. Invented
+# future dates here once broke that ordering and the contract test caught it.
 logs = [
-    {"t": "2027-01-01 09:14:02", "level": "info", "text": "Console started"},
-    {"t": "2027-01-01 09:14:03", "level": "info", "text": "Master Controller link up"},
+    {"t": time.strftime("%Y-%m-%d %H:%M:%S"), "level": "info", "text": "Console started"},
+    {"t": time.strftime("%Y-%m-%d %H:%M:%S"), "level": "info", "text": "Master Controller link up"},
 ]
 
 
 def clamp(value, low, high):
     return max(low, min(high, value))
+
+
+# ---- strict request parsing ----
+#
+# This mock is the reference implementation the backend is built from, so it
+# does what the contract says rather than what is convenient: a missing or
+# out-of-range field is REJECTED with 400, never clamped or defaulted. A
+# lenient reference teaches a lenient backend, and a backend that quietly turns
+# volume 500 into 100 hides the bug in whatever sent it. contract-test.py holds
+# both this and the C backend to the same rules.
+
+class BadRequest(Exception):
+    pass
+
+
+def need(body, key, kind):
+    """The field, if present and of the right JSON type; otherwise BadRequest.
+    bool is excluded from int because JSON `true` is not a number."""
+    if key not in body:
+        raise BadRequest("%s is required" % key)
+    value = body[key]
+    ok = {
+        "int": type(value) is int,
+        "bool": type(value) is bool,
+        "str": isinstance(value, str),
+        "dict": isinstance(value, dict),
+    }[kind]
+    if not ok:
+        raise BadRequest("%s must be a %s" % (key, {"int": "number", "bool": "true or false",
+                                                      "str": "string", "dict": "JSON object"}[kind]))
+    return value
+
+
+def need_pct(body, key):
+    value = need(body, key, "int")
+    if not 0 <= value <= 100:
+        raise BadRequest("%s must be 0-100" % key)
+    return value
 
 
 def log(level, text):
@@ -177,7 +221,8 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
 
         if path == "/api/status":
-            payload = dict(state)
+            payload = {"api": API_VERSION}
+            payload.update(state)
             payload["level"] = simulated_level()
             payload["hardware"] = False
             payload["modules"] = modules
@@ -199,9 +244,19 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self.send_json({"error": "malformed body"}, status=400)
+        if not isinstance(body, dict):
+            return self.send_json({"error": "body must be a JSON object"}, status=400)
 
+        try:
+            return self.dispatch_command(path, body)
+        except BadRequest as exc:
+            # Malformed: missing field, wrong type, out of range. Distinct from
+            # 409, which is a well-formed request that is not possible right now.
+            return self.send_json({"error": str(exc)}, status=400)
+
+    def dispatch_command(self, path, body):
         if path == "/api/lane":
-            ok, reason = select_lane(int(body.get("lane", 0)))
+            ok, reason = select_lane(need(body, "lane", "int"))
             if not ok:
                 # The reason rides on the 409, not on state["message"] — it is
                 # a transient notice the UI holds for a few seconds, not a
@@ -211,23 +266,23 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             return self.send_json({"ok": True})
 
         if path == "/api/hold":
+            on = need(body, "on", "bool")
             if state["lane"] == 0:
                 return self.send_json({"error": "no lane selected"}, status=409)
 
-            state["held"] = bool(body.get("on"))
+            state["held"] = on
             lane = find_lane(state["lane"])
             # Parking drops audio but keeps the lane ours until someone takes it.
-            state["mic"] = not state["held"]
-            state["mute"] = state["held"]
-            state["message"] = "%s %s" % (
-                lane["label"], "on hold" if state["held"] else "live")
+            state["mic"] = not on
+            state["mute"] = on
+            state["message"] = "%s %s" % (lane["label"], "on hold" if on else "live")
             return self.send_json({"ok": True})
 
         if path in ("/api/mic", "/api/mute"):
+            on = need(body, "on", "bool")
             if state["lane"] == 0:
                 return self.send_json({"error": "no lane selected"}, status=409)
 
-            on = bool(body.get("on"))
             lane = find_lane(state["lane"])
             if path == "/api/mic":
                 state["mic"] = on
@@ -239,15 +294,15 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             return self.send_json({"ok": True})
 
         if path == "/api/volume":
-            state["volume"] = clamp(int(body.get("value", state["volume"])), 0, 100)
+            state["volume"] = need_pct(body, "value")
             return self.send_json({"ok": True})
 
         if path == "/api/brightness":
-            state["brightness"] = clamp(int(body.get("value", state["brightness"])), 0, 100)
+            state["brightness"] = need_pct(body, "value")
             return self.send_json({"ok": True})
 
         if path == "/api/audio-out":
-            target = body.get("id", "speaker")
+            target = need(body, "id", "str")
             if target != "speaker" and not any(m["id"] == target for m in modules):
                 return self.send_json({"error": "no such module"}, status=400)
             state["audio_out"] = target
@@ -255,7 +310,7 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             return self.send_json({"ok": True})
 
         if path == "/api/layout":
-            position = body.get("position")
+            position = need(body, "position", "str")
             if position not in LAYOUTS:
                 return self.send_json({"error": "bad position"}, status=400)
             state["layout"] = position
@@ -264,28 +319,36 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
         # ---- installer configuration ----
 
         if path == "/api/lanes":
-            count = set_lane_count(int(body.get("count", len(state["lanes"]))))
+            count = need(body, "count", "int")
+            if not MIN_LANES <= count <= MAX_LANES:
+                raise BadRequest("count must be %d-%d" % (MIN_LANES, MAX_LANES))
+            set_lane_count(count)
             log("info", "Lane count set to %d" % count)
-            return self.send_json({"ok": True, "count": count})
+            return self.send_json({"ok": True})
 
         if path == "/api/lane-config":
-            lane = find_lane(int(body.get("lane", 0)))
+            lane = find_lane(need(body, "lane", "int"))
             if lane is None:
                 return self.send_json({"error": "no such lane"}, status=400)
 
-            if "label" in body:
-                lane["label"] = str(body["label"])[:24]
-            if "tag" in body:
-                if body["tag"] not in TAGS:
-                    return self.send_json({"error": "bad tag"}, status=400)
-                lane["tag"] = body["tag"]
-            if "out_volume" in body:
-                lane["out_volume"] = clamp(int(body["out_volume"]), 0, 100)
+            # Validate every field before applying any, so a bad request never
+            # leaves the lane half-changed.
+            label = need(body, "label", "str")[:23] if "label" in body else None
+            tag = need(body, "tag", "str") if "tag" in body else None
+            if tag is not None and tag not in TAGS:
+                raise BadRequest("bad tag")
+            out = need_pct(body, "out_volume") if "out_volume" in body else None
 
+            if label is not None:
+                lane["label"] = label
+            if tag is not None:
+                lane["tag"] = tag
+            if out is not None:
+                lane["out_volume"] = out
             return self.send_json({"ok": True})
 
         if path == "/api/title":
-            state["title"] = str(body.get("text", ""))[:32]
+            state["title"] = need(body, "text", "str")[:31]
             return self.send_json({"ok": True})
 
         if path == "/api/brand":
@@ -293,44 +356,46 @@ class ConsoleHandler(SimpleHTTPRequestHandler):
             # sends it; the backend stores the selection and serves the theme
             # back. The C backend behaves the same way. In production this
             # endpoint belongs behind the configuration password.
-            shade = body.get("shade", "base")
+            shade = need(body, "shade", "str")
             if shade not in ("light", "base", "dark"):
-                return self.send_json({"error": "bad shade"}, status=400)
-            supplied = body.get("theme")
-            if not isinstance(supplied, dict):
-                return self.send_json({"error": "bad theme"}, status=400)
+                raise BadRequest("bad shade")
+            supplied = need(body, "theme", "dict")
+            base = body.get("base", "")
+            if not isinstance(base, str):
+                raise BadRequest("base must be a string")
 
             theme.clear()
             theme.update(supplied)
-            state["brand"] = {"base": str(body.get("base", "")), "shade": shade}
-            log("info", "Brand colour set to %s %s"
-                % (state["brand"]["base"] or "default", shade))
+            state["brand"] = {"base": base[:7], "shade": shade}
+            log("info", "Brand colour set to %s %s" % (base or "default", shade))
             return self.send_json({"ok": True})
 
         if path == "/api/auth":
-            scope = body.get("scope")
+            scope = need(body, "scope", "str")
+            password = need(body, "password", "str")
             if scope not in PASSWORDS:
-                return self.send_json({"error": "bad scope"}, status=400)
-            if str(body.get("password", "")) != PASSWORDS[scope]:
+                raise BadRequest("unknown scope")
+            if password != PASSWORDS[scope]:
                 log("warn", "Failed %s unlock" % scope)
                 return self.send_json({"error": "incorrect"}, status=403)
             log("info", "%s screen unlocked" % scope.title())
             return self.send_json({"ok": True})
 
         # ---- simulation, so every lane state is reachable without a site ----
+        # Development only: the C backend has none of these, and a real site
+        # gets these states from the Master Controller.
 
         if path == "/api/sim":
-            lane = find_lane(int(body.get("lane", 0)))
-            status = body.get("status")
-            if lane is None or status not in (
-                    LANE_IDLE, LANE_BUSY, LANE_HOLD, LANE_ERROR):
-                return self.send_json({"error": "bad sim"}, status=400)
+            lane = find_lane(need(body, "lane", "int"))
+            status = need(body, "status", "str")
+            if lane is None or status not in (LANE_IDLE, LANE_BUSY, LANE_HOLD, LANE_ERROR):
+                raise BadRequest("bad sim")
 
             if lane["id"] == state["lane"]:
                 release_lane()
 
             lane["status"] = status
-            lane["owner"] = body.get("owner", "Console 2") if status in (
+            lane["owner"] = str(body.get("owner", "Console 2")) if status in (
                 LANE_BUSY, LANE_HOLD) else None
             return self.send_json({"ok": True})
 

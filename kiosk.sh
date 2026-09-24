@@ -13,12 +13,18 @@
 URL="${CONSOLE_URL:-http://127.0.0.1:8000}"
 PORT="${CONSOLE_PORT:-8000}"
 
+# Extra arguments for cog: platform/backend selection, scale, and so on.
+# Confirm these against the environment guide's Display Configuration section
+# during hardware bring-up. Set in deploy/operatorconsole-kiosk.service
+# (Environment=COG_ARGS=...) rather than by editing this script.
+COG_ARGS="${COG_ARGS:-}"
+
 # Deployment units run cog directly. On the bench, CONSOLE_CAGE=1 runs it under
 # cage, which supplies a visible mouse cursor.
 if [ "${CONSOLE_CAGE:-0}" = "1" ]; then
-    LAUNCH="cage -- cog $URL"
+    LAUNCH="cage -- cog $COG_ARGS $URL"
 else
-    LAUNCH="cog $URL"
+    LAUNCH="cog $COG_ARGS $URL"
 fi
 
 echo "kiosk: waiting for backend on port $PORT"
