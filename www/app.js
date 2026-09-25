@@ -161,15 +161,16 @@ function mix(a, b, t) {
 var WHITE = [255, 255, 255], BLACK = [0, 0, 0], LED_BODY = [29, 31, 38];
 
 /* CSS variables for one lane: its colour, a readable ink for the number on
-   it, and the LED at ~10% (dim, "in a call on another console") and unlit.
+   it, the LED dimmed ("in a call on another console": ~10% on the physical
+   LED, but on an LCD it has to stay distinguishable from unlit) and unlit.
    Computed here rather than with color-mix(), which older WPE builds lack. */
 function laneVars(colorId) {
   var hex = LANE_COLORS[colorId] || LANE_COLORS.white;
   var rgb = hexToRgb(hex);
   var ink = contrast(rgb, BLACK) >= contrast(rgb, WHITE) ? "#111111" : "#FFFFFF";
   return "--lane:" + hex + ";--lane-ink:" + ink +
-         ";--lane-dim:" + rgbToHex(mix(LED_BODY, rgb, 0.22)) +
-         ";--lane-off:" + rgbToHex(mix(LED_BODY, rgb, 0.07));
+         ";--lane-dim:" + rgbToHex(mix(LED_BODY, rgb, 0.42)) +
+         ";--lane-off:" + rgbToHex(mix(LED_BODY, rgb, 0.08));
 }
 
 /* ---- customer branding (later version; behind features.customer_branding) ----
@@ -368,10 +369,6 @@ document.addEventListener("alpine:init", function () {
         if (this.laneRows === 2) return { unit: 60, led: 46 };
         if (this.laneCols <= 4) return { unit: 132, led: 96 };
         return { unit: 96, led: 68 };
-      },
-
-      get heldLanes() {
-        return this.lanes.filter(function (l) { return l.call && l.call.state === "held"; });
       },
 
       get otherLanes() {

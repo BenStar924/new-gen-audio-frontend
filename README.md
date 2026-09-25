@@ -74,8 +74,8 @@ call always takes the whole screen, and a locked console always shows Locked.
 
 | View | Shown when | Who |
 | --- | --- | --- |
-| Locked | `login_required` and nobody logged in | Username (checked at once), then a 4-digit PIN. Lane lights, clock, and Answer buttons when `answer_without_pin` is on |
-| Main | Default | Lane grid: identity graphic (number + lane colour) above a call-status LED pushbutton. One touch answers or calls |
+| Locked | `login_required` and nobody logged in | Username (checked at once); the 10-key PIN pad appears once the name is valid. Lane lights, clock, and Answer buttons when `answer_without_pin` is on |
+| Main | Default | Lane grid: identity graphic (number + lane colour; a label) above a call-status LED pushbutton (the only tap target). No status text: the LED behaviour is the status. One touch answers or calls |
 | Active call | `status.call` is set | Mute mic, Hold, volume, output, Hang up. A restricted call gets volume and Hang up only |
 | Troubleshooting | Masthead wrench | This console's heartbeats and codes; Download log, Help, Restart software. Master: the A2B chain diagram and Restart lane audio |
 | Help | Troubleshooting → Help | Manuals as page images (WPE has no PDF viewer) |

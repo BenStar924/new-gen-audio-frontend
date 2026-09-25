@@ -18,7 +18,7 @@
 
   <!-- ============================ MASTHEAD ============================ -->
   <header class="flex items-center justify-between gap-3 px-3 py-1 bg-navy shrink-0 h-16">
-    <div class="flex items-center gap-3 min-w-0">
+    <div class="flex items-center gap-3 shrink-0">
       <!-- The Hamilton mark is ALWAYS Hamilton navy on a white plate: a brand
            asset, not chrome, so no theme can repaint it (literal hex on
            purpose). A long press here opens the hidden Developer entry, on the
@@ -30,9 +30,10 @@
           <rect x="1" y="1" width="46" height="46" rx="11" fill="#fff"/>
           <path fill="#2B2A5E" d="M14 13h6.5v8.5h7V13H34v22h-6.5v-8.6h-7V35H14z"/>
         </svg>
-        <!-- Master Console cue. Placeholder look; the final one is open. -->
+        <!-- Master Console cue: subtle and non-text, for technicians, not
+             tellers. Placeholder look; the final one is open. -->
         <span x-show="isMaster" aria-label="Master console" data-testid="master-cue"
-              class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-master border-2 border-navy"></span>
+              class="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-navy-tint"></span>
       </div>
       <div class="leading-none min-w-0">
         <h1 class="text-lg font-extrabold tracking-[0.1em] text-onchrome truncate" x-text="title">HUBS Audio</h1>
@@ -40,7 +41,7 @@
       </div>
     </div>
 
-    <div class="flex items-center gap-2 shrink-0">
+    <div class="flex items-center gap-2 min-w-0">
       <!-- Status light: red on any error or failed heartbeat anywhere, yellow
            on warnings only, green otherwise. Same rule on every screen. -->
       <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/20" data-testid="status-light"
@@ -49,7 +50,7 @@
         <span class="text-[10px] font-extrabold tracking-[0.12em] uppercase text-onchrome" x-text="statusLabel"></span>
       </div>
 
-      <div x-show="user && !locked" class="flex flex-col items-end leading-tight px-2 max-w-[10rem]" data-testid="user-chip">
+      <div x-show="user && !locked" class="flex flex-col items-end leading-tight px-1 min-w-0 max-w-[8rem]" data-testid="user-chip">
         <span class="text-xs font-bold text-onchrome truncate max-w-full" x-text="user && user.name"></span>
         <span class="text-[9px] font-bold tracking-[0.12em] uppercase text-navy-tint"
               x-text="user && roleLabels[user.role]"></span>
@@ -57,19 +58,21 @@
 
       <template x-if="view === 'main'">
         <div class="flex items-center gap-2">
-          <button type="button" class="btn btn-chrome min-h-14 w-14 px-0" aria-label="Troubleshooting"
+          <button type="button" class="btn btn-chrome min-h-14 px-2.5 gap-1.5 text-sm" aria-label="Troubleshooting"
                   x-show="can('troubleshooting')"
                   x-on:pointerup.prevent.throttle.250ms="go('troubleshooting')">
             <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M22.7 19 13.6 9.9c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4Z"/>
             </svg>
+            <span>Troubleshoot</span>
           </button>
-          <button type="button" class="btn btn-chrome min-h-14 w-14 px-0" aria-label="Settings"
+          <button type="button" class="btn btn-chrome min-h-14 px-2.5 gap-1.5 text-sm" aria-label="Settings"
                   x-show="can('settings')"
                   x-on:pointerup.prevent.throttle.250ms="go('settings')">
             <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.7l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.7L4.5 11a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2.1 1.6a.5.5 0 0 0-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6c0 .3.2.5.5.5h4c.3 0 .5-.2.5-.5l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.7L19.4 13ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
             </svg>
+            <span>Settings</span>
           </button>
         </div>
       </template>
@@ -126,7 +129,11 @@
               x-text="login.username || 'Tap to enter your name'"></span>
       </button>
 
-      <div class="flex items-center justify-between min-h-6">
+      <p x-show="!login.valid" class="text-sm font-bold"
+         :class="login.error ? 'text-danger' : 'text-dim'"
+         x-text="login.error || (login.checking ? 'Checking…' : 'Enter your name to log in.')"></p>
+
+      <div x-show="login.valid" class="flex items-center justify-between min-h-6">
         <div class="flex gap-2.5" aria-label="PIN entered" role="img">
           <template x-for="i in session.pin_length" :key="i">
             <span class="w-3.5 h-3.5 rounded-full border-2 border-ink"
@@ -135,10 +142,11 @@
         </div>
         <span class="text-xs font-bold truncate"
               :class="login.error ? 'text-danger' : 'text-dim'"
-              x-text="login.error || (login.checking ? 'Checking…' : (login.valid ? 'Enter your PIN' : ''))"></span>
+              x-text="login.error || 'Enter your PIN'"></span>
       </div>
 
-      <div class="grid grid-cols-3 gap-1.5 flex-1 min-h-0">
+      <!-- 10-key pad, shown once the name is valid. -->
+      <div x-show="login.valid" class="grid grid-cols-3 gap-1.5 flex-1 min-h-0">
         <template x-for="d in ['1','2','3','4','5','6','7','8','9']" :key="d">
           <button type="button" class="btn btn-sm text-lg min-h-0 h-full" :disabled="!login.valid"
                   :aria-label="'PIN ' + d"
@@ -154,45 +162,33 @@
   </main>
 
   <!-- ============================== MAIN ==============================
-       One tile per lane: its identity (unit graphic in the lane's colour,
-       with its number) above its call-status LED pushbutton. One touch
+       One column per lane, left to right: its identity piece (graphic of the
+       unit in the lane's colour, with its number; a label, not a button)
+       above its call-status LED pushbutton, which is the tap target. Status
+       is the LED's behaviour only: no text, no colour change. One touch
        answers a ringing lane or calls an idle or held one. -->
-  <main x-show="view === 'main'" data-view="main" class="flex-1 min-h-0 flex flex-col gap-2 p-2.5">
-    <!-- Held calls are a system-wide reminder: the LED slow-blinks on every
-         console, and this line says for how long. -->
-    <div x-show="heldLanes.length" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-alt border-2 border-warn shrink-0">
-      <span class="eyebrow text-warn-d">On hold</span>
-      <template x-for="lane in heldLanes" :key="lane.id">
-        <span class="text-xs font-bold" x-text="'Lane ' + lane.number + ' · ' + elapsed(lane.call.since)"></span>
-      </template>
-    </div>
-
+  <main x-show="view === 'main'" data-view="main" class="flex-1 min-h-0 flex flex-col p-2.5">
     <div class="lane-grid flex-1 min-h-0"
          :style="'grid-template-columns:repeat(' + laneCols + ',minmax(0,1fr));grid-template-rows:repeat(' + laneRows + ',minmax(0,1fr))'">
       <template x-for="lane in lanes" :key="lane.id">
-        <button type="button" class="card flex flex-col items-center justify-evenly min-w-0 min-h-0 py-1.5 cursor-pointer"
-                :style="laneVars(lane)" :data-lane="lane.number"
-                :aria-label="ledLabel(lane)"
-                x-on:pointerup.prevent.throttle.250ms="tapLane(lane)">
-          <!-- Identity piece. Placeholder unit graphic; the number and colour
-               are what matter and both come from the lane's settings. -->
-          <svg viewBox="0 0 60 72" aria-hidden="true" :style="'height:' + laneSize.unit + 'px'">
+        <div class="card flex flex-col items-center justify-evenly min-w-0 min-h-0 py-1.5" :style="laneVars(lane)">
+          <!-- Identity piece. Placeholder unit graphic until the real
+               artwork is supplied; number and colour come from settings. -->
+          <svg viewBox="0 0 60 72" role="img" :aria-label="'Lane ' + lane.number" :style="'height:' + laneSize.unit + 'px'">
             <rect x="7" y="3" width="46" height="54" rx="9" style="fill:var(--lane)"/>
             <rect x="12" y="8" width="36" height="8" rx="4" fill="#000" opacity="0.18"/>
             <rect x="20" y="57" width="20" height="12" style="fill:var(--lane)" opacity="0.7"/>
             <text x="30" y="46" text-anchor="middle" font-size="26" font-weight="800"
                   style="fill:var(--lane-ink)" x-text="lane.number"></text>
           </svg>
-          <span class="led" :class="ledClass(lane)"
-                :style="'width:' + laneSize.led + 'px;height:' + laneSize.led + 'px'">
+          <!-- Call-status piece: an illuminated pushbutton. -->
+          <button type="button" class="led led-button" :class="ledClass(lane)" :data-lane="lane.number"
+                  :style="'width:' + laneSize.led + 'px;height:' + laneSize.led + 'px'"
+                  :aria-label="ledLabel(lane)"
+                  x-on:pointerup.prevent.throttle.250ms="tapLane(lane)">
             <span x-show="lane.health === 'error'" class="text-xl font-extrabold">✕</span>
-          </span>
-          <span class="text-[10px] font-extrabold tracking-[0.05em] uppercase tabular-nums leading-none min-h-[10px] text-dim whitespace-nowrap"
-                x-text="lane.health === 'error' ? 'Out of service'
-                        : laneState(lane) === 'ringing' ? 'Ringing ' + elapsed(lane.call.since)
-                        : laneState(lane) === 'held' ? 'Hold ' + elapsed(lane.call.since)
-                        : laneState(lane) === 'busy' ? 'Busy' : ''"></span>
-        </button>
+          </button>
+        </div>
       </template>
       <p x-show="!lanes.length" class="text-dim self-center justify-self-center">No lanes are configured on this system.</p>
     </div>
@@ -218,7 +214,7 @@
         </p>
       </section>
 
-      <section class="card flex flex-col gap-2.5 p-2.5 min-h-0" :class="call && call.restricted ? 'justify-center' : ''">
+      <section class="card flex flex-col justify-center gap-3 p-2.5 min-h-0">
         <div x-show="call && !call.restricted" class="flex gap-2.5">
           <button type="button" class="btn flex-1 flex-col gap-0.5 min-h-20" aria-label="Mute microphone"
                   :aria-pressed="call && call.mic_muted"
@@ -255,7 +251,7 @@
 
         <!-- Output for this call only. Only outputs the backend has detected
              are listed; with just the built-in speaker there is no choice. -->
-        <div x-show="call && !call.restricted && outputs.length > 1" class="flex flex-col gap-1.5 mt-auto">
+        <div x-show="call && !call.restricted && outputs.length > 1" class="flex flex-col gap-1.5">
           <span class="eyebrow">Audio out</span>
           <div class="flex gap-2">
             <template x-for="o in outputs" :key="o.id">

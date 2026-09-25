@@ -117,7 +117,8 @@ sudo reboot
 | --- | --- |
 | Full permission matrix | Provisional `CAPABILITIES` table (API.md) |
 | Hamilton's 16 lane LED colours | 16 placeholder colours in `LANE_COLORS` (`app.js`) and `LANE_COLORS` (`dev-server.py`) |
-| Master Console cue on the logo | Small amber dot on the logo plate |
+| Master Console cue (subtle, non-text) | Tiny lavender dot in the corner of the logo plate |
+| Lane identity artwork (graphic of the physical unit) | Placeholder rounded unit shape with the lane number |
 | Answering from Locked without a PIN | Behind `features.answer_without_pin` (off); gives a restricted call |
 | Manual lock / switch user | Not provided. Auto-lock only |
 | Log export and config backup transport (USB? A2B SPI?) | `409` with a reason when there's nowhere to write |

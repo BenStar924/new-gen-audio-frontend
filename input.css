@@ -64,6 +64,8 @@
   /* LED housing, and the unlit lens of a lane that is out of service. */
   --color-led-rim:    #2A2C35;
   --color-led-fault:  #50535E;
+  --color-led-bezel:  #CDD1DC;
+  --color-led-bezel-d:#9CA2B4;
 
   /* System stack only — no web font is reachable on the offline device. */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -218,6 +220,16 @@
     justify-content: center;
     color: #fff;
   }
+  /* The main-screen LED is a physical-looking pushbutton: a raised silver
+     bezel around the lens, so it reads as pressable without any text. */
+  .led-button {
+    cursor: pointer;
+    border: 6px solid var(--color-led-bezel);
+    box-shadow: 0 4px 0 var(--color-led-bezel-d), inset 0 3px 6px rgb(0 0 0 / 0.45);
+  }
+  .led-button.is-pressed { transform: translateY(3px); box-shadow: 0 1px 0 var(--color-led-bezel-d); }
+  .led-button.led-on { box-shadow: 0 4px 0 var(--color-led-bezel-d), 0 0 18px var(--lane); }
+
   .led-off   { background: var(--lane-off); }
   .led-on    { background: var(--lane); box-shadow: 0 0 0 3px var(--lane-dim), inset 0 -3px 6px rgb(0 0 0 / 0.2); }
   .led-dim   { background: var(--lane-dim); }
