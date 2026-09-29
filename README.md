@@ -4,16 +4,15 @@ Touchscreen UI for the HUBS Audio drive-thru console (Raspberry Pi Zero 2 W,
 800×480), in Hamilton livery. Static files in `www/`, served by the backend on
 `127.0.0.1:8000` and rendered by Cog / WPE WebKit in fullscreen kiosk mode.
 
-This directory is the device front end. It is **not** part of the Next.js
-coach-platform app and shares nothing with it — no npm runtime dependency, no
-React. ESLint ignores this directory.
+No npm runtime dependency and no framework build: the UI is plain HTML, Alpine
+and a prebuilt Tailwind stylesheet, so `www/` runs on the device as-is.
 
 > **Building the backend?** Start with [HANDOFF.md](HANDOFF.md), then
 > [API.md](API.md) (the contract). `contract-test.py` tells you when you're
 > done. `./make-release.sh` packages everything into one tarball.
 
 ```
-operatorconsole/
+new-gen-audio-frontend/
   HANDOFF.md            # START HERE if you are building the backend
   API.md                # the API contract, v2
   contract-test.py      # the contract as a test: passes = the UI works

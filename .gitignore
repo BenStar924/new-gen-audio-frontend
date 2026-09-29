@@ -1,0 +1,15 @@
+# Build output
+build/
+build-pi/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editors / OS
+.DS_Store
+*.swp
+
+# Optional standalone Tailwind binary (see build-css.sh)
+/tailwindcss
