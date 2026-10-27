@@ -74,7 +74,7 @@ call always takes the whole screen, and a locked console always shows Locked.
 | View | Shown when | Who |
 | --- | --- | --- |
 | Locked | `login_required` and nobody logged in | Username (checked at once); the 10-key PIN pad appears once the name is valid. Lane lights, clock, and Answer buttons when `answer_without_pin` is on |
-| Main | Default | Lane grid: one big button per lane, in the lane's colour with its number, and a round call light with a phone icon inside showing the call status (it pulses while ringing). No status text. One touch answers or calls |
+| Main | Default | Lane grid: one big white button per lane with its number, and a round call light in the lane's colour with a phone icon inside, showing the call status (it pulses while ringing). No status text. One touch answers or calls |
 | Active call | `status.call` is set | Mute mic, Hold, volume, output, Hang up. A restricted call gets volume and Hang up only |
 | Troubleshooting | Masthead wrench | This console's heartbeats and codes; Download log, Help, Restart software. Master: the A2B chain diagram and Restart lane audio |
 | Help | Troubleshooting → Help | Manuals as page images (WPE has no PDF viewer) |
@@ -91,14 +91,14 @@ light, the chain diagram and "this console's codes" are all derived from it.
 
 **The call light communicates by behaviour, never colour**: unlit (no call),
 fast blink with a pulsing ring (ringing), lit (in my call), dim (busy on
-another console), slow blink (on hold, system-wide). It is neutral white/grey
-on every lane. The lane's colour is its identity, fills the whole button, and
-matches the physical lane LED.
+another console), slow blink (on hold, system-wide). The light is in the
+lane's colour, which is its identity and matches the physical lane LED; the
+colour shows in every state, dulled when unlit.
 
 > **Deviation from the design doc:** the doc has a separate identity graphic
-> above the LED pushbutton. By request, the whole button is the lane colour
-> with its number, and the round call light (with a phone icon) sits inside
-> it; the whole button is the tap target.
+> above the LED pushbutton. By request, each lane is one white button with
+> its number, the round call light (lane colour, phone icon) sits inside it,
+> and the whole button is the tap target.
 
 **The status light** is red on any device error or failed heartbeat (`i2c`,
 `a2b`, `master_link`), yellow on warnings only, and green otherwise.

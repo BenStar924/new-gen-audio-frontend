@@ -96,7 +96,7 @@
               <button type="button" class="btn btn-go" :style="laneVars(lane)"
                       :aria-label="'Answer lane ' + lane.number"
                       x-on:pointerup.prevent.throttle.250ms="tapLane(lane)">
-                <span class="lane-key w-8 h-8 text-sm font-extrabold" aria-hidden="true"><span x-text="lane.number"></span><span class="call-dot led-fast"></span></span>
+                <span class="call-light led-fast w-9 h-9 text-sm font-extrabold" aria-hidden="true" x-text="lane.number"></span>
                 <span x-text="'Answer Lane ' + lane.number"></span>
               </button>
             </template>
@@ -109,10 +109,8 @@
            visible before anyone logs in. -->
       <div class="flex flex-wrap gap-2.5 mt-auto">
         <template x-for="lane in lanes" :key="lane.id">
-          <span class="lane-key w-11 h-11 text-base font-extrabold tabular-nums"
-                :class="lane.health === 'error' ? 'lane-key-fault' : ''" :style="laneVars(lane)" :aria-label="ledLabel(lane)" role="img">
-            <span x-text="lane.number"></span><span class="call-dot" :class="ledClass(lane)"></span>
-          </span>
+          <span class="call-light w-11 h-11 text-base font-extrabold tabular-nums" :class="ledClass(lane)"
+                :style="laneVars(lane)" :aria-label="ledLabel(lane)" role="img" x-text="lane.number"></span>
         </template>
       </div>
 
@@ -161,17 +159,17 @@
   </main>
 
   <!-- ============================== MAIN ==============================
-       One button per lane, left to right. The whole button is the lane's
-       colour with its number; inside it, a round call light with a phone
-       icon shows the call status by behaviour only: unlit (no call), lit (in
-       my call), dim (in a call on another console), fast blink with a pulse
-       (ringing), slow blink (on hold). One touch anywhere on the button
+       One white button per lane, left to right, with its number. Inside it
+       a round call light in the lane's colour, with a phone icon, shows the
+       call status by behaviour only: unlit (no call), lit (in my call), dim
+       (in a call on another console), fast blink with a pulse (ringing),
+       slow blink (on hold). One touch anywhere on the button
        answers a ringing lane or calls an idle or held one. -->
   <main x-show="view === 'main'" data-view="main" class="flex-1 min-h-0 flex flex-col p-2.5">
     <div class="lane-grid flex-1 min-h-0"
          :style="'grid-template-columns:repeat(' + laneCols + ',minmax(0,1fr));grid-template-rows:repeat(' + laneRows + ',minmax(0,1fr))'">
       <template x-for="lane in lanes" :key="lane.id">
-        <button type="button" class="lane-key lane-key-big" :class="lane.health === 'error' ? 'lane-key-fault' : ''"
+        <button type="button" class="lane-key-big" :class="lane.health === 'error' ? 'lane-key-fault' : ''"
                 :style="laneVars(lane)" :data-lane="lane.number" :aria-label="ledLabel(lane)"
                 x-on:pointerup.prevent.throttle.250ms="tapLane(lane)">
           <span class="font-extrabold tabular-nums leading-none" :style="'font-size:' + laneSize.num + 'px'"
@@ -195,8 +193,9 @@
   <main x-show="view === 'call'" data-view="call" class="flex-1 min-h-0 flex flex-col gap-2.5 p-2.5">
     <div class="flex-1 min-h-0 grid grid-cols-[13rem_1fr_11rem] gap-2.5">
       <section class="card flex flex-col items-center justify-center gap-2 p-2" :style="laneVars(callLane)">
-        <span class="lane-key w-28 h-28 text-6xl font-extrabold tabular-nums" aria-hidden="true"
-              x-text="callLane && callLane.number"></span>
+        <span class="call-light led-on w-28 h-28" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="call-icon"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.61 21 3 13.39 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2Z"/></svg>
+        </span>
         <p class="text-xl font-extrabold text-ink" x-text="callLane ? 'Lane ' + callLane.number : ''"></p>
         <p class="text-3xl font-extrabold tabular-nums" data-testid="call-timer" x-text="call && elapsed(call.since)"></p>
         <p x-show="call && call.restricted" class="text-[11px] text-center text-dim leading-snug">
@@ -268,10 +267,8 @@
     <div x-show="otherLanes.length" class="flex items-center gap-3 px-3 py-1.5 card shrink-0">
       <span class="eyebrow">Other lanes</span>
       <template x-for="lane in otherLanes" :key="lane.id">
-        <span class="lane-key w-8 h-8 text-sm font-extrabold tabular-nums"
-              :class="lane.health === 'error' ? 'lane-key-fault' : ''" :style="laneVars(lane)" role="img" :aria-label="ledLabel(lane)">
-          <span x-text="lane.number"></span><span class="call-dot" :class="ledClass(lane)"></span>
-        </span>
+        <span class="call-light w-9 h-9 text-sm font-extrabold tabular-nums" :class="ledClass(lane)"
+              :style="laneVars(lane)" role="img" :aria-label="ledLabel(lane)" x-text="lane.number"></span>
       </template>
     </div>
   </main>
@@ -469,7 +466,7 @@
           <span class="eyebrow mb-1">Lanes · number and colour</span>
           <template x-for="lane in settings.lanes" :key="lane.id">
             <div class="flex items-center gap-2.5 py-1 border-b border-line-d" :style="laneVars(lane)">
-              <span class="lane-key w-9 h-9 text-sm font-extrabold tabular-nums shrink-0" aria-hidden="true" x-text="lane.number"></span>
+              <span class="call-light led-on w-9 h-9 text-sm font-extrabold tabular-nums shrink-0" aria-hidden="true" x-text="lane.number"></span>
               <span class="mono text-[11px] text-mute w-16 truncate" x-text="lane.id"></span>
               <button type="button" class="btn btn-sm w-28 justify-between" :aria-label="'Number for ' + lane.id"
                       x-on:pointerup.prevent.throttle.250ms="editLaneNumber(lane)">
