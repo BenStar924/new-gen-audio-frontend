@@ -158,19 +158,15 @@ function mix(a, b, t) {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-var WHITE = [255, 255, 255], BLACK = [0, 0, 0], LED_BODY = [29, 31, 38];
+var WHITE = [255, 255, 255], BLACK = [0, 0, 0];
 
-/* CSS variables for one lane: its colour, a readable ink for the number on
-   it, the LED dimmed ("in a call on another console": ~10% on the physical
-   LED, but on an LCD it has to stay distinguishable from unlit) and unlit.
-   Computed here rather than with color-mix(), which older WPE builds lack. */
+/* CSS variables for one lane: its colour and a readable ink for the number
+   on it. Lane colour is identity only; call status is the call light. */
 function laneVars(colorId) {
   var hex = LANE_COLORS[colorId] || LANE_COLORS.white;
   var rgb = hexToRgb(hex);
   var ink = contrast(rgb, BLACK) >= contrast(rgb, WHITE) ? "#111111" : "#FFFFFF";
-  return "--lane:" + hex + ";--lane-ink:" + ink +
-         ";--lane-dim:" + rgbToHex(mix(LED_BODY, rgb, 0.42)) +
-         ";--lane-off:" + rgbToHex(mix(LED_BODY, rgb, 0.08));
+  return "--lane:" + hex + ";--lane-ink:" + ink;
 }
 
 /* ---- customer branding (later version; behind features.customer_branding) ----
@@ -365,10 +361,11 @@ document.addEventListener("alpine:init", function () {
       /* Pixel sizes for the identity graphic and LED button. Fixed steps
          rather than percentages: the LED must stay round whichever of the
          tile's width or height is the tighter one. */
+      /* Pixel sizes of the number and the call light on a lane button. */
       get laneSize() {
-        if (this.laneRows === 2) return { unit: 60, led: 46 };
-        if (this.laneCols <= 4) return { unit: 132, led: 96 };
-        return { unit: 96, led: 68 };
+        if (this.laneRows === 2) return { num: 44, light: 52 };
+        if (this.laneCols <= 4) return { num: 104, light: 116 };
+        return { num: 72, light: 84 };
       },
 
       get otherLanes() {
@@ -572,8 +569,8 @@ document.addEventListener("alpine:init", function () {
         return (lane && lane.call && lane.call.state) || "idle";
       },
 
-      /* LED behaviour only (on/off/blink speed/brightness), never colour, so
-         it reads the same for colour-blind operators. */
+      /* Call-light behaviour only (on/off/blink speed/brightness), never
+         colour, so it reads the same for colour-blind operators. */
       ledClass: function (lane) {
         if (lane.health === "error") return "led-fault";
         if (lane.id === this.pendingLane) return "led-pending";

@@ -13,3 +13,6 @@ __pycache__/
 
 # Optional standalone Tailwind binary (see build-css.sh)
 /tailwindcss
+
+# Build tooling (npm install)
+node_modules/

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the purged, minified stylesheet into www/vendor/app.css.
 #
-# Run this in WSL2 whenever the markup changes — Tailwind emits only the classes
+# Run this whenever the markup changes — Tailwind emits only the classes
 # it can see in www/, so a class added to index.html does not exist until this
 # runs. The device never compiles CSS: the Play CDN is a runtime in-browser
 # compiler, unreachable offline and wasteful on this board.
@@ -22,8 +22,12 @@ if [ -x "./tailwindcss" ]; then
     echo "building with standalone CLI"
     ./tailwindcss -i "$IN" -o "$OUT" --minify
 else
-    echo "no ./tailwindcss standalone binary, falling back to npx"
-    npx --yes @tailwindcss/cli@4 -i "$IN" -o "$OUT" --minify
+    # Otherwise the pinned dev dependency from package.json (npm install).
+    if [ ! -x node_modules/.bin/tailwindcss ]; then
+        echo "installing build tooling (npm install)"
+        npm install --no-audit --no-fund
+    fi
+    node_modules/.bin/tailwindcss -i "$IN" -o "$OUT" --minify
 fi
 
 echo "wrote $OUT ($(wc -c < "$OUT") bytes)"

@@ -1,0 +1,12 @@
+{
+  "name": "new-gen-audio-frontend",
+  "private": true,
+  "description": "Build tooling only: compiles input.css to www/vendor/app.css. Nothing here ships to the device.",
+  "scripts": {
+    "build:css": "tailwindcss -i input.css -o www/vendor/app.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.0",
+    "tailwindcss": "4.3.0"
+  }
+}

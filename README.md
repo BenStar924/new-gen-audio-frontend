@@ -74,7 +74,7 @@ call always takes the whole screen, and a locked console always shows Locked.
 | View | Shown when | Who |
 | --- | --- | --- |
 | Locked | `login_required` and nobody logged in | Username (checked at once); the 10-key PIN pad appears once the name is valid. Lane lights, clock, and Answer buttons when `answer_without_pin` is on |
-| Main | Default | Lane grid: identity graphic (number + lane colour; a label) above a call-status LED pushbutton (the only tap target). No status text: the LED behaviour is the status. One touch answers or calls |
+| Main | Default | Lane grid: one big button per lane, in the lane's colour with its number, and a round call light with a phone icon inside showing the call status (it pulses while ringing). No status text. One touch answers or calls |
 | Active call | `status.call` is set | Mute mic, Hold, volume, output, Hang up. A restricted call gets volume and Hang up only |
 | Troubleshooting | Masthead wrench | This console's heartbeats and codes; Download log, Help, Restart software. Master: the A2B chain diagram and Restart lane audio |
 | Help | Troubleshooting → Help | Manuals as page images (WPE has no PDF viewer) |
@@ -89,10 +89,16 @@ the master?" directly. The backend enforces the same table (API.md).
 **Device status has one source**: `status.devices`. The lane grid, the status
 light, the chain diagram and "this console's codes" are all derived from it.
 
-**LEDs communicate by behaviour, never colour**: off (idle), fast blink
-(ringing), solid (in my call), dim (busy on another console), slow blink (on
-hold, system-wide). The lane's colour is its identity and matches the physical
-lane LED.
+**The call light communicates by behaviour, never colour**: unlit (no call),
+fast blink with a pulsing ring (ringing), lit (in my call), dim (busy on
+another console), slow blink (on hold, system-wide). It is neutral white/grey
+on every lane. The lane's colour is its identity, fills the whole button, and
+matches the physical lane LED.
+
+> **Deviation from the design doc:** the doc has a separate identity graphic
+> above the LED pushbutton. By request, the whole button is the lane colour
+> with its number, and the round call light (with a phone icon) sits inside
+> it; the whole button is the tap target.
 
 **The status light** is red on any device error or failed heartbeat (`i2c`,
 `a2b`, `master_link`), yellow on warnings only, and green otherwise.
@@ -141,9 +147,10 @@ on some touch panels.
 actions in dense lists. There's no text selection, no double-tap zoom, and the
 shell never scrolls.
 
-**No CSS transitions.** The one animation is the LED blink, which uses
-`steps()`: every frame is fully lit or fully unlit, so the GPU never
-interpolates. Measure it on the device (see *Before shipping*).
+**No CSS transitions.** The only animations are the call-light blink, which
+uses `steps()` so every frame is fully lit or fully unlit, and the ringing
+pulse, which animates only `transform` and `opacity` (compositor-only, no
+repaint). Measure it on the device (see *Before shipping*).
 
 **No physical keyboard** exists on a deployed console, so every entry goes
 through the on-screen keyboard modal (`promptKeyboard`).
@@ -219,5 +226,5 @@ provide it, either by switching to a VT with a getty or through SSH.
 ## Before shipping
 
 Measure on a **Lite** card: cold start time, `free -h` headroom at idle, the CPU
-cost of blinking LEDs (several lanes ringing at once), and that every control
+cost of blinking and pulsing call lights (several lanes ringing at once), and that every control
 responds to a single finger tap, not just a mouse click.
