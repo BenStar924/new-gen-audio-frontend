@@ -205,34 +205,45 @@
     gap: 0.6rem;
   }
 
-  /* The lane button: white, with the lane number, steady in every state.
-     A raised bezel makes it read as pressable without any text. */
+  /* The lane button: a flat white key, like a professional intercom key
+     panel. Thin border, no ornament; the lane number is the label. */
   .lane-key-big {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-evenly;
+    justify-content: center;
+    gap: 9%;
     min-width: 0;
     min-height: 0;
     width: 100%;
     height: 100%;
-    border-radius: 1.1rem;
-    border: 3px solid var(--color-line);
+    border-radius: 0.6rem;
+    border: 1px solid var(--color-line);
     background: var(--color-surface);
     color: var(--color-ink);
-    box-shadow: 0 5px 0 var(--color-line);
+    box-shadow: 0 1px 2px rgb(16 23 32 / 0.06);
     cursor: pointer;
   }
-  .lane-key-big.is-pressed { transform: translateY(4px); box-shadow: 0 1px 0 var(--color-line); }
+  .lane-key-big.is-pressed { background: var(--color-alt); }
+  .lane-key-title { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
+  .lane-key-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+  }
+  .lane-key-number { font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
   .lane-key-fault { background: var(--color-alt); color: var(--color-mute); }
 
-  /* The call light: a round light in the lane's colour, with a phone icon
-     (or the lane number on the compact versions). The colour is the lane's
-     identity and shows in every state; call status is behaviour only
-     (unlit, lit, dim, fast or slow blink), so it reads the same to a
-     colour-blind operator. Blinks use steps() so the GPU never
-     interpolates; the ringing pulse animates only transform and opacity,
-     which the compositor handles without repainting. */
+  /* The call light: a round indicator in the lane's colour with a line
+     phone icon (or the lane number on the compact versions). Unlit it is an
+     outline in the lane colour, so the lane is identifiable when idle; dim
+     is a pale fill; lit is the full colour. Call status is behaviour only
+     (unlit, dim, lit, fast or slow blink), so it reads the same to a
+     colour-blind operator. Flat: no glow, no bevel. Blinks use steps() so
+     the GPU never interpolates; the ringing pulse animates only transform
+     and opacity, which the compositor handles without repainting. */
   .call-light {
     position: relative;
     display: flex;
@@ -240,42 +251,48 @@
     justify-content: center;
     flex-shrink: 0;
     border-radius: 9999px;
-    border: 3px solid rgb(0 0 0 / 0.3);
-    background: var(--lane-off);
-    color: var(--lane-off-ink);
-    box-shadow: inset 0 3px 8px rgb(0 0 0 / 0.45);
+    border: 2px solid var(--lane-ring);
+    background: var(--color-surface);
+    color: var(--lane-ring);
   }
-  .call-icon { width: 52%; height: 52%; fill: currentColor; }
-  .call-fault-mark { font-size: 1.4em; font-weight: 800; color: #fff; }
+  .call-icon {
+    width: 44%;
+    height: 44%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .call-fault-mark { font-size: 1em; font-weight: 700; }
 
-  .led-off   { background: var(--lane-off); color: var(--lane-off-ink); }
-  .led-on    { background: var(--lane); color: var(--lane-ink);
-               box-shadow: 0 0 18px var(--lane), inset 0 -3px 6px rgb(0 0 0 / 0.15); }
-  .led-dim   { background: var(--lane-dim); color: var(--lane-dim-ink); }
+  .led-off   { background: var(--color-surface); color: var(--lane-ring); }
+  .led-on    { background: var(--lane); border-color: var(--lane-ring); color: var(--lane-ink); }
+  .led-dim   { background: var(--lane-soft); color: var(--lane-ring); }
   .led-fast  { animation: call-blink 0.5s steps(1, end) infinite; }
   .led-slow  { animation: call-blink 1.6s steps(1, end) infinite; }
-  .led-pending { background: var(--lane-dim); color: var(--lane-dim-ink); border-style: dashed; border-color: var(--lane); }
-  .led-fault { background: var(--color-led-fault); color: #fff; }
+  .led-pending { background: var(--lane-soft); color: var(--lane-ring); border-style: dashed; }
+  .led-fault { background: var(--color-alt); border-color: var(--color-mute); border-style: dashed; color: var(--color-mute); }
 
   @keyframes call-blink {
     0%   { background: var(--lane); color: var(--lane-ink); }
-    50%  { background: var(--lane-off); color: var(--lane-off-ink); }
+    50%  { background: var(--color-surface); color: var(--lane-ring); }
   }
 
-  /* Ringing: a ring in the lane's colour pulses outward from the light. */
+  /* Ringing: a thin ring in the lane's colour expands from the light. */
   .led-fast::after {
     content: "";
     position: absolute;
-    inset: -4px;
+    inset: -2px;
     border-radius: 9999px;
-    border: 4px solid var(--lane);
-    animation: call-pulse 1s ease-out infinite;
+    border: 2px solid var(--lane-ring);
+    animation: call-pulse 1.2s ease-out infinite;
     pointer-events: none;
   }
 
   @keyframes call-pulse {
-    0%   { transform: scale(1);   opacity: 0.9; }
-    100% { transform: scale(1.7); opacity: 0; }
+    0%   { transform: scale(1);   opacity: 0.7; }
+    100% { transform: scale(1.45); opacity: 0; }
   }
 
   /* A2B chain diagram: the node where a failure starts. */

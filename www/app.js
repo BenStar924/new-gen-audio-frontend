@@ -158,30 +158,23 @@ function mix(a, b, t) {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-var WHITE = [255, 255, 255], BLACK = [0, 0, 0], LENS = [29, 31, 38];
+var WHITE = [255, 255, 255], BLACK = [0, 0, 0];
 
-/* CSS variables for one lane's call light, which is in the lane's colour.
-   It always shows that colour, so the lane is identifiable in every state:
-   unlit is the colour dulled (like an unlit coloured lens), dim is brighter
-   ("in a call on another console"; ~10% on the physical LED, but on an LCD
-   it has to be told apart from unlit), lit is the full colour. Each shade
-   has an ink for the icon or number on it. Computed here rather than with
-   color-mix(), which older WPE builds lack. */
+/* CSS variables for one lane's call light, which is in the lane's colour:
+   the colour itself; a "ring" shade of it dark enough to read on white
+   (outline and icon of an unlit light, which is how the lane stays
+   identifiable when idle); a pale "soft" tint (dim: in a call on another
+   console); and an ink for the icon on the full colour (lit). Computed here
+   rather than with color-mix(), which older WPE builds lack. */
 function laneVars(colorId) {
   var hex = LANE_COLORS[colorId] || LANE_COLORS.white;
   var rgb = hexToRgb(hex);
   var ink = contrast(rgb, BLACK) >= contrast(rgb, WHITE) ? "#111111" : "#FFFFFF";
-  var off = mix(LENS, rgb, 0.34), dim = mix(LENS, rgb, 0.66);
+  var ring = rgb, guard = 0;
+  while (contrast(ring, WHITE) < 3 && guard < 40) { ring = mix(ring, BLACK, 0.06); guard++; }
   return "--lane:" + hex + ";--lane-ink:" + ink +
-         ";--lane-dim:" + rgbToHex(dim) + ";--lane-dim-ink:" + lensInk(dim, rgb) +
-         ";--lane-off:" + rgbToHex(off) + ";--lane-off-ink:" + lensInk(off, rgb);
-}
-
-/* The icon or number on an unlit or dim light: a light tint of the lane
-   colour, or near-black where the lens is too light for that to read. */
-function lensInk(bg, rgb) {
-  var tint = mix(rgb, WHITE, 0.6);
-  return contrast(tint, bg) >= 3 ? rgbToHex(tint) : "#111111";
+         ";--lane-ring:" + rgbToHex(ring) +
+         ";--lane-soft:" + rgbToHex(mix(rgb, WHITE, 0.72));
 }
 
 /* ---- customer branding (later version; behind features.customer_branding) ----
@@ -378,9 +371,9 @@ document.addEventListener("alpine:init", function () {
          tile's width or height is the tighter one. */
       /* Pixel sizes of the number and the call light on a lane button. */
       get laneSize() {
-        if (this.laneRows === 2) return { num: 44, light: 52 };
-        if (this.laneCols <= 4) return { num: 104, light: 116 };
-        return { num: 72, light: 84 };
+        if (this.laneRows === 2) return { num: 30, light: 44 };
+        if (this.laneCols <= 4) return { num: 56, light: 76 };
+        return { num: 40, light: 58 };
       },
 
       get otherLanes() {

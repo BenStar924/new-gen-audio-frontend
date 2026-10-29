@@ -133,6 +133,10 @@ URI. The device is offline, and CDN requests hang until they time out.
 curl -s http://127.0.0.1:8000 | grep -iE "cdn|https?://"    # expect no output
 ```
 
+**Icons are inline SVG.** The phone icon on the call lights is Lucide's
+`phone` (ISC licence, which permits commercial use; keep the notice if the
+icon set is ever vendored as files).
+
 **The Hamilton mark is always Hamilton navy** (`#2B2A5E`) on a white plate. It
 is the one thing on screen a theme can't repaint.
 
