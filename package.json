@@ -1,12 +1,14 @@
 {
   "name": "new-gen-audio-frontend",
   "private": true,
-  "description": "Build tooling only: compiles input.css to www/vendor/app.css. Nothing here ships to the device.",
+  "description": "Build and test tooling only: the CSS build and the screen-size test. Nothing here ships to the device.",
   "scripts": {
-    "build:css": "tailwindcss -i input.css -o www/vendor/app.css --minify"
+    "build:css": "tailwindcss -i input.css -o www/vendor/app.css --minify",
+    "test:screens": "node tests/screen-sizes.mjs"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.0",
-    "tailwindcss": "4.3.0"
+    "tailwindcss": "4.3.0",
+    "playwright": "1.64.1"
   }
 }

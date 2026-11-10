@@ -76,6 +76,46 @@ scale is 1.25. Both panels are 7-inch, so every control keeps the same
 physical size on the glass: a 64px touch target stays about 15 mm. Nothing
 else needs changing for a different panel size.
 
+**Supported sizes: landscape, 800×480 or larger.** Each of these is checked
+on every push (`npm run test:screens`, which runs in CI), with 1, 6 and 15
+lanes, on every main screen:
+
+| Size | Example panel |
+| --- | --- |
+| 800×480 | the design canvas; older 7" panels |
+| 1024×600 | Waveshare 7" HDMI LCD (C), the production panel |
+| 1280×800 | common 10.1" panels |
+| 1280×720, 1920×1080 | 16:9 panels |
+| 1024×768 | 4:3 panels |
+
+Portrait and anything smaller than 800×480 are **not supported**. The Active
+Call screen does not fit, and the test fails on them on purpose.
+
+**Changing panel:**
+1. Try it first: `SIZES=1366x768 npm run test:screens` runs the same checks
+   at that size without editing anything.
+2. If it passes, add it to the list in `tests/screen-sizes.mjs` and to the
+   table above.
+3. Scaling assumes a 7-inch panel, so a bigger panel at a higher resolution
+   gets physically bigger buttons. That's usable, but if it needs tuning, a
+   per-device scale setting is the planned next step.
+
+**Mounting sideways: rotate at the OS level, never in the UI.** The UI keeps
+seeing a landscape screen. Two settings, both **to verify on the device**:
+- **Display.** Cog's DRM platform takes a rotation parameter. In
+  `deploy/operatorconsole-kiosk.service`, set
+  `Environment=COG_ARGS=--platform=drm --platform-params=rotation=1`,
+  where 1 = 90°, 2 = 180° and 3 = 270°.
+- **Touch.** It has to be rotated to match, through libinput. Add a udev rule
+  in `/etc/udev/rules.d/99-touch-rotate.rules`, putting the touch
+  controller's name (from `libinput list-devices`) where it says `<touch name>`:
+
+  ```
+  ENV{ID_INPUT_TOUCHSCREEN}=="1", ATTRS{name}=="<touch name>", ENV{LIBINPUT_CALIBRATION_MATRIX}="0 1 0 -1 0 1"
+  ```
+
+  Matrices: 90° `0 1 0 -1 0 1` · 180° `-1 0 1 0 -1 1` · 270° `0 -1 1 1 0 0`.
+
 **Wiring to a Pi Zero 2 W:**
 - Video: the Pi has a **mini-HDMI** port, so use a mini-HDMI to HDMI cable.
 - Touch: the panel's touch USB goes to the Pi's micro-USB **data** port

@@ -2,7 +2,7 @@
 # no login prompt.
 #
 # This unit deliberately does not depend on the backend's unit by name. The
-# front end's only dependency is "something on 127.0.0.1:8000 speaking API v1",
+# front end's only dependency is "something on 127.0.0.1:8000 speaking API v2",
 # and kiosk.sh waits for that port before starting Cog. So the backend can be
 # any process with any unit name, owned by whoever builds it.
 #
@@ -38,6 +38,8 @@ Environment=CONSOLE_PORT=8000
 
 # Cog platform/display flags. Confirm against the environment guide's Display
 # Configuration section on real hardware. Empty = Cog's defaults.
+# To mount the panel rotated: --platform=drm --platform-params=rotation=1
+# (1=90, 2=180, 3=270 degrees), and rotate touch to match. See README, Display.
 Environment=COG_ARGS=
 
 # A real session on tty1, so Cog can own the display and read the touchscreen.

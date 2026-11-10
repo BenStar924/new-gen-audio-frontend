@@ -111,6 +111,17 @@ sudo reboot
 - **After updating `www/`,** run `install.sh` again. It clears Cog's caches.
 - To stage files without a device: `./deploy/install.sh --destdir /tmp/stage`.
 
+## Display requirements
+
+- **Panel:** landscape, **800×480 or larger**. Production is the Waveshare 7"
+  HDMI LCD (C) at 1024×600. The UI scales itself to fill the panel. Portrait
+  and smaller panels are not supported (the Active Call screen does not fit).
+- **Supported sizes:** listed in README → Display. CI checks every screen at
+  each of them, with `npm run test:screens`.
+- **Mounting rotated:** rotate the display (Cog DRM `rotation` parameter) and
+  the touch input (libinput calibration matrix) at the OS level, never in the
+  UI. Steps are in README → Display.
+
 ## Open items (need a decision; the UI has a placeholder)
 
 | Item | UI today |
