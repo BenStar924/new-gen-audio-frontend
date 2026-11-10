@@ -1,7 +1,7 @@
 # HUBS Audio console — front end
 
 Touchscreen UI for the HUBS Audio drive-thru console (Raspberry Pi Zero 2 W,
-800×480), in Hamilton livery. Static files in `www/`, served by the backend on
+Waveshare 7" HDMI LCD (C) at 1024×600), in Hamilton livery. Static files in `www/`, served by the backend on
 `127.0.0.1:8000` and rendered by Cog / WPE WebKit in fullscreen kiosk mode.
 
 No npm runtime dependency and no framework build: the UI is plain HTML, Alpine
@@ -64,6 +64,47 @@ CONSOLE_CAGE=1 ./kiosk.sh      # bench: under cage, so there is a mouse cursor
 
 WPE caches aggressively. `deploy/install.sh` clears the caches; by hand:
 `rm -rf ~/.cache/cog ~/.cache/wpe* ~/.local/share/cog`.
+
+## Display
+
+**Panel:** [Waveshare 7inch HDMI LCD (C)](https://www.waveshare.com/product/7inch-hdmi-lcd-c.htm),
+1024×600, with capacitive touch over USB.
+
+**Scaling:** the layout is designed at **800×480** and scaled to fill whatever
+panel it runs on (`fit to the panel` at the top of `app.js`). At 1024×600 the
+scale is 1.25. Both panels are 7-inch, so every control keeps the same
+physical size on the glass: a 64px touch target stays about 15 mm. Nothing
+else needs changing for a different panel size.
+
+**Wiring to a Pi Zero 2 W:**
+- Video: the Pi has a **mini-HDMI** port, so use a mini-HDMI to HDMI cable.
+- Touch: the panel's touch USB goes to the Pi's micro-USB **data** port
+  (marked USB, not PWR), through a micro-USB OTG cable or adapter. The touch
+  shows up as a standard USB HID device, so no driver is needed.
+
+**Pi settings: unverified.** I couldn't open Waveshare's page from this
+session, so check these against their wiki before relying on them.
+- Under the default KMS driver (`dtoverlay=vc4-kms-v3d`), the panel normally
+  reports its mode over EDID and needs no settings.
+- If it comes up at the wrong resolution, the lines Waveshare documents for
+  this panel go in `config.txt`:
+
+  ```
+  hdmi_group=2
+  hdmi_mode=87
+  hdmi_cvt 1024 600 60 6 0 0 0
+  hdmi_drive=1
+  ```
+
+  These apply to the legacy firmware display path. Under KMS, force the mode
+  instead by adding `video=HDMI-A-1:1024x600@60` to `cmdline.txt`.
+
+**Still to check on the real hardware:**
+- Whether the Pi's micro-USB port can power the panel's touch, or the panel
+  needs its own supply.
+- Touch-to-display alignment.
+- Whether the backlight can be dimmed from software. It matters for the
+  screensaver: right now that is a black screen with the backlight left on.
 
 ## Screens
 

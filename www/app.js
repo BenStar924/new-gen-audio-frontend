@@ -78,6 +78,24 @@
   });
 })();
 
+/* ---------- fit to the panel ----------
+ *
+ * The layout is designed at 800x480. The production panel (Waveshare 7"
+ * HDMI LCD (C)) is 1024x600 at the same 7-inch size, so the whole UI is
+ * scaled up to fill it: every control keeps the same physical size on the
+ * glass it was designed for (a 64px touch target stays about 15mm). On an
+ * 800x480 panel the scale is 1. Uses CSS zoom, which WebKit has long
+ * supported, set before Alpine paints so there is no visible jump. */
+var DESIGN_WIDTH = 800, DESIGN_HEIGHT = 480;
+(function () {
+  function fit() {
+    var scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / DESIGN_HEIGHT);
+    document.documentElement.style.zoom = scale > 1 ? String(Math.floor(scale * 100) / 100) : "";
+  }
+  fit();
+  window.addEventListener("resize", fit);
+})();
+
 /* ---------- constants ---------- */
 
 var API_VERSION = 2;
