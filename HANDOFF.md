@@ -116,6 +116,10 @@ sudo reboot
 - **Panel:** landscape, **800×480 or larger**. Production is the Waveshare 7"
   HDMI LCD (C) at 1024×600. The UI scales itself to fill the panel. Portrait
   and smaller panels are not supported (the Active Call screen does not fit).
+- **Per-device scaling:** for a panel that isn't 7-inch, set
+  `CONSOLE_PANEL_INCHES` (its diagonal) in the kiosk unit; `CONSOLE_SCALE`
+  sets an exact factor. Both are read by `kiosk.sh` and passed to the UI in
+  its URL; the backend is not involved.
 - **Supported sizes:** listed in README → Display. CI checks every screen at
   each of them, with `npm run test:screens`.
 - **Mounting rotated:** rotate the display (Cog DRM `rotation` parameter) and

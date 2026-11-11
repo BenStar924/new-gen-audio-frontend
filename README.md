@@ -70,15 +70,24 @@ WPE caches aggressively. `deploy/install.sh` clears the caches; by hand:
 **Panel:** [Waveshare 7inch HDMI LCD (C)](https://www.waveshare.com/product/7inch-hdmi-lcd-c.htm),
 1024×600, with capacitive touch over USB.
 
-**Scaling:** the layout is designed at **800×480** and scaled to fill whatever
-panel it runs on (`fit to the panel` at the top of `app.js`). At 1024×600 the
-scale is 1.25. Both panels are 7-inch, so every control keeps the same
-physical size on the glass: a 64px touch target stays about 15 mm. Nothing
-else needs changing for a different panel size.
+**Scaling:** the layout is designed at **800×480 on a 7-inch panel**. It is
+scaled to suit each device, set in the kiosk unit
+(`deploy/operatorconsole-kiosk.service`), with no code change:
+
+| Setting | When | What happens |
+| --- | --- | --- |
+| *(neither set)* | Any 7" panel, including the production 1024×600 | Fits the panel: scale 1.25 at 1024×600, so a 64px touch target stays about 15 mm |
+| `CONSOLE_PANEL_INCHES=10.1` | A bigger or smaller panel | Controls keep their designed physical size, and a bigger panel shows more room rather than bigger buttons |
+| `CONSOLE_SCALE=1.4` | Tuning by eye | An exact factor; wins if both are set |
+
+Whatever is set, the scale never goes beyond what fits, so the layout is
+always fully on screen. The Developer screen shows the resolution, scale and
+mode in use, e.g. `1280x800 · scale 1.12 (panel)`. The logic is in
+`displayScale` at the top of `app.js`.
 
 **Supported sizes: landscape, 800×480 or larger.** Each of these is checked
 on every push (`npm run test:screens`, which runs in CI), with 1, 6 and 15
-lanes, on every main screen:
+lanes, on every main screen. The test also checks the scale arithmetic:
 
 | Size | Example panel |
 | --- | --- |
@@ -87,6 +96,7 @@ lanes, on every main screen:
 | 1280×800 | common 10.1" panels |
 | 1280×720, 1920×1080 | 16:9 panels |
 | 1024×768 | 4:3 panels |
+| 1280×800 at 10.1", 1024×600 at 10.1", 1920×1080 at 15.6" | with `CONSOLE_PANEL_INCHES` set |
 
 Portrait and anything smaller than 800×480 are **not supported**. The Active
 Call screen does not fit, and the test fails on them on purpose.
@@ -96,9 +106,8 @@ Call screen does not fit, and the test fails on them on purpose.
    at that size without editing anything.
 2. If it passes, add it to the list in `tests/screen-sizes.mjs` and to the
    table above.
-3. Scaling assumes a 7-inch panel, so a bigger panel at a higher resolution
-   gets physically bigger buttons. That's usable, but if it needs tuning, a
-   per-device scale setting is the planned next step.
+3. If it isn't 7-inch, set `CONSOLE_PANEL_INCHES` in the kiosk unit to its
+   diagonal, and test with `SIZES=1280x800@10.1` (`@` = inches).
 
 **Mounting sideways: rotate at the OS level, never in the UI.** The UI keeps
 seeing a landscape screen. Two settings, both **to verify on the device**:

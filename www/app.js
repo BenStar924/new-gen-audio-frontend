@@ -80,20 +80,53 @@
 
 /* ---------- fit to the panel ----------
  *
- * The layout is designed at 800x480. The production panel (Waveshare 7"
- * HDMI LCD (C)) is 1024x600 at the same 7-inch size, so the whole UI is
- * scaled up to fill it: every control keeps the same physical size on the
- * glass it was designed for (a 64px touch target stays about 15mm). On an
- * 800x480 panel the scale is 1. Uses CSS zoom, which WebKit has long
- * supported, set before Alpine paints so there is no visible jump. */
-var DESIGN_WIDTH = 800, DESIGN_HEIGHT = 480;
-(function () {
-  function fit() {
-    var scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / DESIGN_HEIGHT);
-    document.documentElement.style.zoom = scale > 1 ? String(Math.floor(scale * 100) / 100) : "";
+ * The layout is designed at 800x480 on a 7-inch panel. It is scaled with CSS
+ * zoom (which WebKit has long supported), set before Alpine paints so there
+ * is no visible jump. Three modes, chosen per device from the page URL that
+ * the kiosk opens (kiosk.sh builds it from CONSOLE_PANEL_INCHES and
+ * CONSOLE_SCALE in the kiosk unit):
+ *
+ *   (default)       fit: as large as the panel allows. Right for 7-inch
+ *                   panels of any resolution, such as the production
+ *                   Waveshare 7" 1024x600 (scale 1.25).
+ *   ?panel=10.1     physical: the panel's diagonal in inches. Controls keep
+ *                   the physical size they were designed at (a 64px touch
+ *                   target stays about 15mm), so a bigger panel shows more
+ *                   room instead of bigger buttons.
+ *   ?scale=1.4      exact: a fixed factor, for tuning by eye.
+ *
+ * Whatever the mode, the scale never exceeds what fits: the 800x480 layout
+ * must always be on screen. The result is kept in window.HUBS_DISPLAY and
+ * shown on the Developer screen. */
+var DESIGN_WIDTH = 800, DESIGN_HEIGHT = 480, DESIGN_INCHES = 7;
+
+function displayScale(width, height, query) {
+  var params = new URLSearchParams(query || "");
+  var fit = Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
+  var scale = fit, mode = "fit";
+  var exact = parseFloat(params.get("scale"));
+  var inches = parseFloat(params.get("panel"));
+  if (exact >= 0.5 && exact <= 4) {
+    scale = exact; mode = "scale";
+  } else if (inches >= 3 && inches <= 32) {
+    var designPpi = Math.sqrt(DESIGN_WIDTH * DESIGN_WIDTH + DESIGN_HEIGHT * DESIGN_HEIGHT) / DESIGN_INCHES;
+    var panelPpi = Math.sqrt(width * width + height * height) / inches;
+    scale = panelPpi / designPpi; mode = "panel";
   }
-  fit();
-  window.addEventListener("resize", fit);
+  var clamped = scale > fit;
+  if (clamped) scale = fit;
+  return { width: width, height: height, mode: mode, clamped: clamped,
+           scale: Math.floor(scale * 100) / 100 };
+}
+
+(function () {
+  function apply() {
+    var d = displayScale(window.innerWidth, window.innerHeight, window.location.search);
+    window.HUBS_DISPLAY = d;
+    document.documentElement.style.zoom = d.scale === 1 ? "" : String(d.scale);
+  }
+  apply();
+  window.addEventListener("resize", apply);
 })();
 
 /* ---------- constants ---------- */
@@ -246,6 +279,14 @@ document.addEventListener("alpine:init", function () {
   Alpine.data("hubsConsole", function () {
     return {
       uiVersion: "1.0.0",
+
+      /* Display size and scale, for the Developer screen. */
+      get displayText() {
+        var d = window.HUBS_DISPLAY;
+        if (!d) return "";
+        return d.width + "x" + d.height + " · scale " + d.scale + " (" + d.mode +
+               (d.clamped ? ", limited to fit" : "") + ")";
+      },
       apiVersion: API_VERSION,
       backendApi: null,
       builtinUser: BUILTIN_USER,

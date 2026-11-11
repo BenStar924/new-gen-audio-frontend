@@ -13,6 +13,23 @@
 URL="${CONSOLE_URL:-http://127.0.0.1:8000}"
 PORT="${CONSOLE_PORT:-8000}"
 
+# Display scaling for this device (see "fit to the panel" in www/app.js).
+# Leave both empty for 7-inch panels: the UI fits itself. CONSOLE_PANEL_INCHES
+# is the panel diagonal, so a bigger panel keeps controls at their designed
+# physical size; CONSOLE_SCALE is an exact factor and wins if both are set.
+QUERY=""
+if [ -n "${CONSOLE_SCALE:-}" ]; then
+    QUERY="scale=$CONSOLE_SCALE"
+elif [ -n "${CONSOLE_PANEL_INCHES:-}" ]; then
+    QUERY="panel=$CONSOLE_PANEL_INCHES"
+fi
+if [ -n "$QUERY" ]; then
+    case "$URL" in
+        *\?*) URL="$URL&$QUERY" ;;
+        *)    URL="${URL%/}/?$QUERY" ;;
+    esac
+fi
+
 # Extra arguments for cog: platform/backend selection, scale, and so on.
 # Confirm these against the environment guide's Display Configuration section
 # during hardware bring-up. Set in deploy/operatorconsole-kiosk.service

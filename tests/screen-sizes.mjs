@@ -6,7 +6,9 @@
 //
 // The supported sizes are listed in README.md (Display). Add a size here
 // before promising it to anyone. To try a panel first without editing this
-// file:  SIZES=1366x768,1280x1024 npm run test:screens
+// file:  SIZES=1366x768,1280x800@10.1 npm run test:screens
+// ("@10.1" gives the panel's diagonal in inches, as CONSOLE_PANEL_INCHES
+// does on the device.) It also checks the display-scale arithmetic.
 // Chromium comes from Playwright; to use one already on the machine, set
 // CHROMIUM_PATH to its executable.
 
@@ -26,9 +28,18 @@ const DEFAULT_SIZES = [
   [1280, 720],  // 16:9
   [1024, 768],  // 4:3
   [1920, 1080], // 16:9 large
+  // With the panel's size set (CONSOLE_PANEL_INCHES): controls keep their
+  // physical size, so the layout gets more room than the 800x480 canvas.
+  [1280, 800, 10.1],
+  [1024, 600, 10.1],
+  [1920, 1080, 15.6],
 ];
 const SIZES = process.env.SIZES
-  ? process.env.SIZES.split(",").map((t) => t.trim().split("x").map(Number))
+  ? process.env.SIZES.split(",").map((t) => {
+      const [res, inches] = t.trim().split("@");
+      const [w, h] = res.split("x").map(Number);
+      return inches ? [w, h, Number(inches)] : [w, h];
+    })
   : DEFAULT_SIZES;
 const LANE_COUNTS = [1, 6, 15];
 
@@ -85,7 +96,7 @@ async function layoutProblems(page) {
   });
 }
 
-async function checkSize(browser, base, lanes, [w, h]) {
+async function checkSize(browser, base, lanes, [w, h, inches]) {
   const page = await browser.newPage({ viewport: { width: w, height: h } });
   const problems = [];
   page.on("pageerror", (e) => problems.push(`page error: ${e.message}`));
@@ -95,7 +106,7 @@ async function checkSize(browser, base, lanes, [w, h]) {
   };
 
   await sim(base, "reset", {});
-  await page.goto(base + "/");
+  await page.goto(base + (inches ? `/?panel=${inches}` : "/"));
   await settle(page);
 
   // Main, with every call state on show.
@@ -146,16 +157,62 @@ async function checkSize(browser, base, lanes, [w, h]) {
   return problems;
 }
 
+// The display-scale arithmetic (displayScale in www/app.js), on known cases.
+const SCALE_CASES = [
+  // width, height, query, expected scale, mode, limited to fit
+  [800, 480, "", 1, "fit", false],
+  [1024, 600, "", 1.25, "fit", false],          // the production panel
+  [1280, 800, "?panel=10.1", 1.12, "panel", false],
+  [1024, 600, "?panel=10.1", 0.88, "panel", false],
+  [1024, 600, "?panel=7", 1.25, "panel", true], // physical 1.27 > fit 1.25
+  [1024, 600, "?scale=1.1", 1.1, "scale", false],
+  [1024, 600, "?scale=3", 1.25, "scale", true],
+  [1024, 600, "?scale=abc", 1.25, "fit", false], // nonsense is ignored
+  [1024, 600, "?panel=1", 1.25, "fit", false],   // out of range is ignored
+];
+
+async function checkScaleMath(browser, base) {
+  const page = await browser.newPage({ viewport: { width: 800, height: 480 } });
+  await page.goto(base + "/");
+  const results = await page.evaluate((cases) => cases.map(([w, h, q]) => displayScale(w, h, q)), SCALE_CASES);
+  await page.close();
+  const problems = [];
+  SCALE_CASES.forEach(([w, h, q, scale, mode, clamped], i) => {
+    const r = results[i];
+    if (r.scale !== scale || r.mode !== mode || r.clamped !== clamped) {
+      problems.push(`${w}x${h}${q}: got scale ${r.scale} (${r.mode}${r.clamped ? ", limited" : ""}), ` +
+                    `want ${scale} (${mode}${clamped ? ", limited" : ""})`);
+    }
+  });
+  return problems;
+}
+
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 let failed = 0;
 try {
+  {
+    const { proc, base } = await startBackend(1);
+    try {
+      const problems = await checkScaleMath(browser, base);
+      if (problems.length) {
+        failed++;
+        console.log("FAIL  display-scale arithmetic");
+        for (const p of problems) console.log(`        ${p}`);
+      } else {
+        console.log(`ok    display-scale arithmetic (${SCALE_CASES.length} cases)`);
+      }
+    } finally {
+      proc.kill();
+    }
+  }
   for (const lanes of LANE_COUNTS) {
     const { proc, base } = await startBackend(lanes);
     try {
       for (const size of SIZES) {
         const problems = await checkSize(browser, base, lanes, size);
-        const label = `${size[0]}x${size[1]}, ${lanes} lane${lanes === 1 ? "" : "s"}`;
+        const label = `${size[0]}x${size[1]}${size[2] ? ` at ${size[2]}"` : ""}, ` +
+                      `${lanes} lane${lanes === 1 ? "" : "s"}`;
         if (problems.length) {
           failed++;
           console.log(`FAIL  ${label}`);

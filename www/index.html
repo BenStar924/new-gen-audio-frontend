@@ -405,7 +405,7 @@
     <div class="flex items-center gap-2 shrink-0">
       <h2 class="eyebrow mr-auto text-[11px]"
           x-text="dev.mode === 'applog' ? 'Developer · Application log' : dev.mode === 'terminal' ? 'Developer · Terminal' : 'Developer'"></h2>
-      <span class="text-[11px] text-dim tabular-nums" x-text="'UI ' + uiVersion + ' · API v' + apiVersion + (backendApi !== null ? ' (backend v' + backendApi + ')' : '')"></span>
+      <span class="text-[11px] text-dim tabular-nums" x-text="'UI ' + uiVersion + ' · API v' + apiVersion + (backendApi !== null ? ' (backend v' + backendApi + ')' : '') + ' · ' + displayText"></span>
       <button type="button" class="btn btn-sm btn-primary" aria-label="Exit developer"
               x-on:pointerup.prevent.throttle.250ms="exitDeveloper()">Exit</button>
     </div>

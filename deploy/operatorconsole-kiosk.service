@@ -36,6 +36,13 @@ RestartSec=2
 Environment=CONSOLE_URL=http://127.0.0.1:8000
 Environment=CONSOLE_PORT=8000
 
+# Display scaling. Leave empty on 7-inch panels (the UI fits itself). For a
+# bigger or smaller panel, set its diagonal in inches so controls keep their
+# designed physical size, e.g. CONSOLE_PANEL_INCHES=10.1. CONSOLE_SCALE sets
+# an exact factor instead (e.g. 1.4). See README, Display.
+Environment=CONSOLE_PANEL_INCHES=
+Environment=CONSOLE_SCALE=
+
 # Cog platform/display flags. Confirm against the environment guide's Display
 # Configuration section on real hardware. Empty = Cog's defaults.
 # To mount the panel rotated: --platform=drm --platform-params=rotation=1
